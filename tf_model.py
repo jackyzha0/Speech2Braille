@@ -10,7 +10,7 @@ import librosa.feature as lib_feat
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
 #PARAMS
-path = '/home/jacky/Desktop/Spyre/nsound_git/__data/TIMIT/*/*/*'
+path = '/home/jacky/Desktop/Spyre/__data/TIMIT/*/*/*'
 num_mfccs = 13
 batchsize = 10
 preprocess = 1
