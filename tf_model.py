@@ -9,15 +9,21 @@ import librosa.display as lib_disp
 import librosa.feature as lib_feat
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
-#Test
+#TODO
+"""
+Implement Connectionist Temporal Classification as
+an optimization function
+"""
 
 #PARAMS
+FLAGS = None
 path = '/home/jacky/Desktop/Spyre/__data/TIMIT/*/*/*'
 num_mfccs = 13
 batchsize = 10
 preprocess = 1
 learning_rate = 0.001
-FLAGS = none
+#0th indice +  space + blank label = 28 characters
+num_classes = ord('z') - ord('a') + 3
 
 def load_dir(fp):
     """
@@ -91,27 +97,22 @@ def BLSTM():
     """
     """
 
-def initplaceholders():
-    """
-    Create placeholder variables for input tensors (labels and features)
-    """
-    features_placeholder = tf.placeholder(tf.float32, shape=(batch_size, num_mfccs+4))
-    labels_placeholder = tf.placeholder(tf.string, shape=(batch_size))
-    return features_placeholder, labels_placeholder
-
 def fill_feed_dict(data,truth_label,index):
     """
     Outputs feed dictionary for training
     Form of:
     feed_dict = {<placeholder>: <tensor values>}
     """
-    print('Constructing input dictionary of size %d' % len(raw_snd),end='')
+    print('Constructing input dictionary of size %d' % len(data),end='')
     feature_vec = []
-    for i in range(0,len(raw_snd)):
-        if (i%500 == 0) :
-            print('.', end='')
-        feature_vec.append(features(raw_snd[i],num_mfccs))
-    return dict(zip(feature_vec, phoneme_list))
+    label_vec = []
+    if i > (len(data)-batchsize)-(len(data)%10):
+        raise ValueError('Out of Bounds')
+    else:
+        for i in range(index,index+batchsize):
+            feature_vec.append(features(data[i],num_mfccs))
+            label_vec.append(label_vec[i])
+    return dict(zip(feature_vec, label_vec))
 
 def plot(spec):
     """
@@ -142,4 +143,11 @@ def main(_):
         loaded = load_dir(path)
         raw_sound = loaded[0]
         print('Done!')
-        dict = contr_dict(raw_sound, loaded[1])
+        dict = fill_feed_dict(raw_sound,loaded[1],0)
+        print(dict)
+
+        features_placeholder = tf.placeholder(tf.float32, shape=(None, num_mfccs+4))
+        labels_placeholder = tf.placeholder(tf.string, shape=(batch_size))
+
+        #train
+        #eval
