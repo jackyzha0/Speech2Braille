@@ -29,6 +29,7 @@ num_mfccs = 13
 batchsize = 10
 preprocess = 1
 learning_rate = 0.001
+window_cutoff = 5
 #0th indice +  space + blank label = 28 characters
 num_classes = ord('z') - ord('a') + 3
 
@@ -79,21 +80,28 @@ def load_dir(fp):
 
 def features(rawsnd, num) :
     """
-    Compute and return a (n+3)-dimensional Tensorflow feature vector, and length in
-        n Amount of Mel Frequency Ceptral Coefficients
+    1 second = 32 units
+    Compute and return a (num+28,(window_cutoff*32))-dimensional Tensorflow feature vector, and length in
+        num Amount of Mel Frequency Ceptral Coefficients
+        12 Chromagrams
+        7 bands of Spectral Contrast
+        6 bands of Tonal Centroid Features (Tonnetz)
         Zero Crossing Rate
         Spectral Rolloff
         Spectral Centroid
     """
-    x, sample_rate = librosa.load(rawsnd,sr=16000, duration=5.00)
+    x, sample_rate = librosa.load(rawsnd,sr=16000, duration=window_cutoff)
+    s_tft = np.abs(librosa.stft(x))
     ft = lib_feat.mfcc(y=x, sr=sample_rate, n_mfcc=num)
+    ft = np.append(ft,lib_feat.chroma_stft(S=s_tft, sr=sample_rate),axis=0)
+    ft = np.append(ft,lib_feat.spectral_contrast(S=s_tft,sr=sample_rate),axis=0)
+    ft = np.append(ft,lib_feat.tonnetz(y=librosa.effects.harmonic(x), sr=sample_rate),axis=0)
     ft = np.append(ft,lib_feat.zero_crossing_rate(y=x),axis=0)
     ft = np.append(ft,lib_feat.spectral_rolloff(y=x,sr=sample_rate),axis=0)
     ft = np.append(ft,lib_feat.spectral_centroid(y=x,sr=sample_rate),axis=0)
-    z = np.zeros((num+3,160-ft.shape[1]))
+    z = np.zeros((num+12+7+6+3,(window_cutoff*32)-ft.shape[1]))
     ft = np.concatenate((ft,z),axis=1)
-    print(ft.shape)
-    return (ft,ft.shape[1])
+    return (ft)
 
 def preprocess(rawsnd) :
     """
