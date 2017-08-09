@@ -5,14 +5,21 @@ import matplotlib.pyplot as plt
 import os
 import glob
 import librosa
+import numpy as np
 import librosa.display as lib_disp
 import librosa.feature as lib_feat
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
 #TODO
 """
-Implement Connectionist Temporal Classification as
+-Finish Batching
+-Add Classes
+-Add blank symbol
+-Implement CTC
+-Complete namescopes for Tensorflow
+-Implement Connectionist Temporal Classification as
 an optimization function
+-Add HMM / N-Gram Language Model
 """
 
 #PARAMS
@@ -22,6 +29,7 @@ num_mfccs = 13
 batchsize = 10
 preprocess = 1
 learning_rate = 0.001
+window_cutoff = 5
 #0th indice +  space + blank label = 28 characters
 num_classes = ord('z') - ord('a') + 3
 
@@ -72,20 +80,28 @@ def load_dir(fp):
 
 def features(rawsnd, num) :
     """
-    Compute and return a (n+4)-dimensional Tensorflow feature vector
-        n Amount of Mel Frequency Ceptral Coefficients
+    1 second = 32 units
+    Compute and return a (num+28,(window_cutoff*32))-dimensional Tensorflow feature vector, and length in
+        num Amount of Mel Frequency Ceptral Coefficients
+        12 Chromagrams
+        7 bands of Spectral Contrast
+        6 bands of Tonal Centroid Features (Tonnetz)
         Zero Crossing Rate
         Spectral Rolloff
-        Spectrall Contrast
         Spectral Centroid
     """
-    x, sample_rate = librosa.load(rawsnd)
-    mf = lib_feat.mfcc(y=x, sr=sample_rate, n_mfcc=num)
-    zcr = lib_feat.zero_crossing_rate(y=x)
-    srolloff = lib_feat.spectral_rolloff(y=x,sr=sample_rate)
-    scontrast = lib_feat.spectral_contrast(y=x,sr=sample_rate)
-    scentroid = lib_feat.spectral_centroid(y=x,sr=sample_rate)
-    return (mf,zcr[0],srolloff[0],scontrast[0],scentroid[0])
+    x, sample_rate = librosa.load(rawsnd,sr=16000, duration=window_cutoff)
+    s_tft = np.abs(librosa.stft(x))
+    ft = lib_feat.mfcc(y=x, sr=sample_rate, n_mfcc=num)
+    ft = np.append(ft,lib_feat.chroma_stft(S=s_tft, sr=sample_rate),axis=0)
+    ft = np.append(ft,lib_feat.spectral_contrast(S=s_tft,sr=sample_rate),axis=0)
+    ft = np.append(ft,lib_feat.tonnetz(y=librosa.effects.harmonic(x), sr=sample_rate),axis=0)
+    ft = np.append(ft,lib_feat.zero_crossing_rate(y=x),axis=0)
+    ft = np.append(ft,lib_feat.spectral_rolloff(y=x,sr=sample_rate),axis=0)
+    ft = np.append(ft,lib_feat.spectral_centroid(y=x,sr=sample_rate),axis=0)
+    z = np.zeros((num+12+7+6+3,(window_cutoff*32)-ft.shape[1]))
+    ft = np.concatenate((ft,z),axis=1)
+    return (ft)
 
 def preprocess(rawsnd) :
     """
@@ -97,22 +113,25 @@ def BLSTM():
     """
     """
 
-def fill_feed_dict(data,truth_label,index):
+def batch(data,truth_label,index):
     """
     Outputs feed dictionary for training
     Form of:
     feed_dict = {<placeholder>: <tensor values>}
     """
-    print('Constructing input dictionary of size %d' % len(data),end='')
+    print('Constructing input dictionary of size %d' % len(data))
     feature_vec = []
     label_vec = []
-    if i > (len(data)-batchsize)-(len(data)%10):
+    largest = 0;
+    if index > (len(data)-batchsize)-(len(data)%batchsize):
         raise ValueError('Out of Bounds')
     else:
         for i in range(index,index+batchsize):
             feature_vec.append(features(data[i],num_mfccs))
-            label_vec.append(label_vec[i])
-    return dict(zip(feature_vec, label_vec))
+            for f in truth_label[i]:
+                label_vec.append(f[1])
+    #return dict(zip(feature_vec, label_vec))
+    return 0
 
 def plot(spec):
     """
@@ -132,22 +151,20 @@ def train():
     Trains the model
     """
 
-def main(_):
-    if tf.gfile.Exists(FLAGS.log_dir):
-        tf.gfile.DeleteRecursively(FLAGS.log_dir)
-    tf.gfile.MakeDirs(FLAGS.log_dir)
-    train()
+init = tf.global_variables_initializer()
 
-    with tf.Session() as sess:
-        print('Loading data', end='')
-        loaded = load_dir(path)
-        raw_sound = loaded[0]
-        print('Done!')
-        dict = fill_feed_dict(raw_sound,loaded[1],0)
-        print(dict)
+# Launch the graph
+with tf.Session() as sess:
+    print('Loading data', end='')
+    loaded = load_dir(path)
+    raw_sound = loaded[0]
+    print('Done!')
+    dict = batch(raw_sound,loaded[1],0)
+    #print(dict)
+    sess.run(init)
+    print('Starting Tensorflow session')
+    features_placeholder = tf.placeholder(tf.float32, shape=(None, num_mfccs+4))
+    labels_placeholder = tf.placeholder(tf.string, shape=(batchsize))
 
-        features_placeholder = tf.placeholder(tf.float32, shape=(None, num_mfccs+4))
-        labels_placeholder = tf.placeholder(tf.string, shape=(batch_size))
-
-        #train
-        #eval
+    #train
+    #eval

@@ -1,0 +1,8 @@
+cd /home/jacky/Desktop/Spyre
+source nsound/bin/activate
+cd nsound_git
+sudo python tf_model.py
+
+#sudo python -m tensorflow.tensorboard --logdir=/home/jacky/Desktop/Spyre/nsound_git/totalsummary --port 6006
+
+#./tf_start in terminal
