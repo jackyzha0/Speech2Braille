@@ -1,14 +1,17 @@
-#!/usr/bin/env python
+# !/usr/local/bin/python
 from __future__ import print_function
 import tensorflow as tf
-import matplotlib.pyplot as plt
 import os
+import sys
 import glob
 import librosa
 import string
 import numpy as np
 import librosa.display as lib_disp
 import librosa.feature as lib_feat
+
+import tf_feed
+
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
 #TODO
@@ -124,51 +127,37 @@ def preprocess(rawsnd) :
 def BLSTM():
     """
     #INCOMPLETE
+    #Class
     """
 
-def batch(data,truth_label,index):
-    """
-    Summary:
-        Creates a tuple of audio features and truth labels
-    Parameters:
-        data : array of string paths to .wav files
-        truth_label : array of strings containing phonemes, start times, and end times
-        index : integer to start batching from
-    Output:
-        2 numpy arrays
-        *Feature vector
-            Dimensions(num_mfccs+28,320)
-        *Label vector
-    """
-    print('Constructing input dictionary of size %d' % len(data))
-    feature_vec = np.empty((num_mfccs+28,window_cutoff*((sample_rate/1000)*2)))
-    label_vec = []
-    if index > (len(data)-batchsize)-(len(data)%batchsize):
-        raise ValueError('Out of Bounds')
-    else:
-        for i in range(index,index+batchsize):
-            np.append(feature_vec,features(data[i],num_mfccs),axis=0)
-            #print(feature_vec)
-            for f in truth_label[i]:
-                label_vec.append(f[2])
-                print(f[2])
-    print(len(label_vec))
-    return feature_vec, lv
-
-def plot(spec):
-    """
-    Summary:
-        Creates and shows librosa plot given output of features
-
-    """
-    plt.subplot(5,1,1)
-    librosa.display.specshow(spec[0], x_axis='time')
-    for i in range(2,6):
-        plt.subplot(5,1,i)
-        plt.plot(spec[i-1])
-    plt.tight_layout()
-    plt.subplots_adjust(hspace=0.37)
-    plt.show()
+# def batch(data,truth_label,index):
+#     """
+#     Summary:
+#         Creates a tuple of audio features and truth labels
+#     Parameters:
+#         data : array of string paths to .wav files
+#         truth_label : array of strings containing phonemes, start times, and end times
+#         index : integer to start batching from
+#     Output:
+#         2 numpy arrays
+#         *Feature vector
+#             Dimensions(num_mfccs+28,320)
+#         *Label vector
+#     """
+#     print('Constructing input dictionary of size %d' % len(data))
+#     feature_vec = np.empty((num_mfccs+28,window_cutoff*((sample_rate/1000)*2)))
+#     label_vec = []
+#     if index > (len(data)-batchsize)-(len(data)%batchsize):
+#         raise ValueError('Out of Bounds')
+#     else:
+#         for i in range(index,index+batchsize):
+#             np.append(feature_vec,features(data[i],num_mfccs),axis=0)
+#             #print(feature_vec)
+#             for f in truth_label[i]:
+#                 label_vec.append(f[2])
+#                 print(f[2])
+#     print(len(label_vec))
+#     return feature_vec, lv
 
 def train():
     """
@@ -184,7 +173,7 @@ with tf.Session() as sess:
     loaded = load_dir(path)
     raw_sound = loaded[0]
     print('Done!')
-    dict = batch(raw_sound,loaded[1],0)
+    dict = tf_feed.data_loader()
     #print(dict)
     sess.run(init)
     print('Starting Tensorflow session')
