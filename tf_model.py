@@ -14,18 +14,6 @@ import tf_feed
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
-#TODO
-"""
--Add proper documentation
--Finish Phoneme Batching
--Fix Label Timing
-    -Add blank '__\n' for zeroes duration
--Complete namescopes for Tensorflow
--Implement Connectionist Temporal Classification as
-an optimization function
--Add HMM / N-Gram Language Model
-"""
-
 #PARAMS
 FLAGS = None
 path = '/home/jacky/Desktop/Spyre/__data/TIMIT/*/*/*'
@@ -129,35 +117,6 @@ def BLSTM():
     #INCOMPLETE
     #Class
     """
-
-# def batch(data,truth_label,index):
-#     """
-#     Summary:
-#         Creates a tuple of audio features and truth labels
-#     Parameters:
-#         data : array of string paths to .wav files
-#         truth_label : array of strings containing phonemes, start times, and end times
-#         index : integer to start batching from
-#     Output:
-#         2 numpy arrays
-#         *Feature vector
-#             Dimensions(num_mfccs+28,320)
-#         *Label vector
-#     """
-#     print('Constructing input dictionary of size %d' % len(data))
-#     feature_vec = np.empty((num_mfccs+28,window_cutoff*((sample_rate/1000)*2)))
-#     label_vec = []
-#     if index > (len(data)-batchsize)-(len(data)%batchsize):
-#         raise ValueError('Out of Bounds')
-#     else:
-#         for i in range(index,index+batchsize):
-#             np.append(feature_vec,features(data[i],num_mfccs),axis=0)
-#             #print(feature_vec)
-#             for f in truth_label[i]:
-#                 label_vec.append(f[2])
-#                 print(f[2])
-#     print(len(label_vec))
-#     return feature_vec, lv
 
 def train():
     """
