@@ -1,6 +1,7 @@
 nsound
-Repository for machine learning projects
-Currently working on hybrid BLSTM-HMM model for robust speech recognition in polyphonic environments
+
+Creating a BLSTM CTC network in Tensorflow for phoneme level speech recognition. More specifically study how adding extra white noise or other sounds (Urban8k or ESC-50) to the background of the TIMIT samples affects the Label Error Rate
+
 
 Files:
 tf_model.py
