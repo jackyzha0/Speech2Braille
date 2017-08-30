@@ -7,8 +7,6 @@ import glob
 import librosa
 import string
 import numpy as np
-import librosa.display as lib_disp
-import librosa.feature as lib_feat
 import data_util
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
@@ -27,37 +25,6 @@ momentum = 0.9
 num_classes = ord('z') - ord('a') + 4
 
 inputs, labels = data_util.getData(num_examples, num_features, num_classes - 1)
-
-def features(rawsnd, num) :
-    """
-    Summary:
-        Compute audio features
-    Parameters:
-        rawsnd : array with string paths to .wav files
-        num : numbers of mfccs to compute
-    Output:
-        Return a (num+28,max_stepsize*32)-dimensional Tensorflow feature vector, and length in
-        *num Amount of Mel Frequency Ceptral Coefficients
-        *12 Chromagrams
-        *7 bands of Spectral Contrast
-        *6 bands of Tonal Centroid Features (Tonnetz)
-        *Zero Crossing Rate
-        *Spectral Rolloff
-        *Spectral Centroid
-    """
-    x, _ = librosa.load(rawsnd,sr=sample_rate, duration=max_stepsize)
-    s_tft = np.abs(librosa.stft(x))
-    ft = lib_feat.mfcc(y=x, sr=sample_rate, n_mfcc=num)
-    ft = np.append(ft,lib_feat.chroma_stft(S=s_tft, sr=sample_rate),axis=0)
-    ft = np.append(ft,lib_feat.spectral_contrast(S=s_tft,sr=sample_rate),axis=0)
-    ft = np.append(ft,lib_feat.tonnetz(y=librosa.effects.harmonic(x), sr=sample_rate),axis=0)
-    ft = np.append(ft,lib_feat.zero_crossing_rate(y=x),axis=0)
-    ft = np.append(ft,lib_feat.spectral_rolloff(y=x,sr=sample_rate),axis=0)
-    ft = np.append(ft,lib_feat.spectral_centroid(y=x,sr=sample_rate),axis=0)
-    z = np.zeros((num+12+7+6+3,(max_stepsize*((sample_rate/1000)*2))-ft.shape[1]))
-    ft = np.concatenate((ft,z),axis=1)
-    #print(ft[13].astype(np.float16))
-    return (ft)
 
 def preprocess(rawsnd,stdev) :
     """
