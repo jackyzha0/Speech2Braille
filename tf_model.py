@@ -3,8 +3,6 @@ from __future__ import print_function
 import tensorflow as tf
 import os
 import sys
-import glob
-import librosa
 import string
 import numpy as np
 import data_util
@@ -24,7 +22,8 @@ momentum = 0.9
 #0th indice + End indice + space + blank label = 28 characters
 num_classes = ord('z') - ord('a') + 4
 
-inputs, labels = data_util.getData(num_examples, num_features, num_classes - 1)
+inputs = []
+labels = []
 
 def preprocess(rawsnd,stdev) :
     """
@@ -55,11 +54,15 @@ init = tf.global_variables_initializer()
 
 # Launch the graph
 with tf.Session() as sess:
-    print('Loading data', end='')
-    loaded = load_dir(path)
-    raw_sound = loaded[0]
+    #Load paths
+    dr = data_util.load_dir(path)
+    print('Getting Data.',end='')
+    #Training Loop
+    for i in range(0,4700/batchsize):
+        print('.',end='')
+        data_util.getData(path, i*batchsize, 4700/batchsize, num_mfccs, num_classes-1)
+
     print('Done!')
-    dict = tf_feed.data_loader()
     #print(dict)
     sess.run(init)
     print('Starting Tensorflow session')

@@ -3,6 +3,9 @@ from __future__ import print_function
 import numpy as np
 import librosa.display as lib_disp
 import librosa.feature as lib_feat
+import tensorflow as tf
+import glob
+import librosa
 
 def sparse_tuple_from(sequences, dtype=np.int32):
     """Create a sparse representention of x. For handling one-hot vector
@@ -74,7 +77,7 @@ def load_dir(fp):
         phonemes = []
         words = []
         text = []
-        for __file in glob.iglob(path + '/*.*'):
+        for __file in glob.iglob(fp + '/*.*'):
                 if not ("SA" in __file):
                     ind+=1
                     if (ind%500==0):
@@ -106,7 +109,11 @@ def load_dir(fp):
 def pad_seq():
     return 0
 
-def getData(filepath, minibatch_size, batches ,num_features ,num_classes):
+def getData(filepath, index, batches ,num_features ,num_classes):
     """
     Return training set and validation set (np arrays)
     """
+    features = []
+    labels = []
+
+    return features, labels
