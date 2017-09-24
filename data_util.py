@@ -10,13 +10,35 @@ import tensorflow as tf
 import glob
 import librosa
 
+#PARAMS
+sample_rate = 32000
+batchsize = -1
+num_mfccs = -1
+num_classes = -1
+max_timestepsize = -1
+max_timesteplen = -1
+
+def setParams(_batchsize, _num_mfccs, _num_classes, _max_timesteps, _timesteplen):
+    """Set Training Parameters
+    Args:
+        _batchsize: size of mini batches
+        _num_mfccs: number of mel-spectrum ceptral coefficients to compute
+        _num_classes: total output types - 1
+        _max_timesteps: max timesteps for minibatch/enveloping
+        _timesteplen: max length of timesteps for minibatch/enveloping
+        """
+    batchsize = _batchsize
+    num_mfccs = _num_mfccs
+    num_classes = _num_classes
+    max_timestepsize = _max_timesteps
+    max_timesteplen = _timesteplen
+
 def sparse_tuple_from(sequences, dtype=np.int32):
     """Create a sparse representention of x. For handling one-hot vector
     Args:
         sequences: a list of lists of type dtype where each element is a sequence
     Returns:
-        A tuple with (indices, values, shape)
-    """
+        A tuple with (indices, values, shape)"""
     indices = []
     values = []
 
@@ -43,9 +65,8 @@ def features(rawsnd, num) :
         *6 bands of Tonal Centroid Features (Tonnetz)
         *Zero Crossing Rate
         *Spectral Rolloff
-        *Spectral Centroid
-    """
-    x, _ = librosa.load(rawsnd,sr=sample_rate, duration=max_stepsize)
+        *Spectral Centroid"""
+    x, _ = librosa.load(rawsnd,sr=sample_rate, duration=max_timesteplen*max_timestepsize)
     s_tft = np.abs(librosa.stft(x))
     ft = lib_feat.mfcc(y=x, sr=sample_rate, n_mfcc=num)
     ft = np.append(ft,lib_feat.chroma_stft(S=s_tft, sr=sample_rate),axis=0)
@@ -68,8 +89,7 @@ def load_dir(fp):
         loaded[0] = sound
         loaded[1] = phonemes
         loaded[2] = words
-        loaded[3] = text
-    """
+        loaded[3] = text"""
     with tf.name_scope('raw_data'):
         ind = 0
         raw_audio = []
@@ -108,11 +128,16 @@ def load_dir(fp):
 def pad_seq():
     return 0
 
-def getData(filepath, index, batches ,num_features ,num_classes):
-    """
-    Return training set and validation set (np arrays)
-    """
-    features = []
-    labels = []
+def next_Data(index,path):
+    """Returns array of size batchsize with features and labels for training
+    Args:
+        index: current position
+    Returns:
+        features = rank 3 tensor of batchsize * maxsize * num_features
+        """
+    featurearr = features(path, num_mfccs)
 
-    return features, labels
+    return features
+
+def next_miniBatch(index):
+    return 0
