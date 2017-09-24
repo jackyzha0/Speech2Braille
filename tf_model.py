@@ -59,7 +59,8 @@ with tf.Session() as sess:
     print('Getting Data.',end='')
     #Training Loop
     for i in range(0,4700/batchsize):
-        print('.',end='')
+        if i%10 == 0:
+            print('.',end='')
         data_util.getData(path, i*batchsize, 4700/batchsize, num_mfccs, num_classes-1)
 
     print('Done!')

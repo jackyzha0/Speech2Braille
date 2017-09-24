@@ -1,5 +1,8 @@
 # !/usr/local/bin/python
 from __future__ import print_function
+
+print('Importing libraries... ')
+
 import numpy as np
 import librosa.display as lib_disp
 import librosa.feature as lib_feat
@@ -28,13 +31,11 @@ def sparse_tuple_from(sequences, dtype=np.int32):
     return indices, values, shape
 
 def features(rawsnd, num) :
-    """
-    Summary:
-        Compute audio features
-    Parameters:
+    """Compute num amount of audio features of a sound
+    Args:
         rawsnd : array with string paths to .wav files
         num : numbers of mfccs to compute
-    Output:
+    Returns:
         Return a (num+28,max_stepsize*32)-dimensional Tensorflow feature vector, and length in
         *num Amount of Mel Frequency Ceptral Coefficients
         *12 Chromagrams
@@ -59,12 +60,10 @@ def features(rawsnd, num) :
     return (ft)
 
 def load_dir(fp):
-    """
-    Summary:
-        Load raw paths data into arrays
-    Parameters:
+    """Load raw paths data into arrays
+    Args:
         fp : string path to data
-    Output:
+    Returns:
         Returns array of loaded files
         loaded[0] = sound
         loaded[1] = phonemes
