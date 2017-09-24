@@ -3,8 +3,6 @@ from __future__ import print_function
 import tensorflow as tf
 import os
 import sys
-import glob
-import librosa
 import string
 import numpy as np
 import data_util
@@ -12,19 +10,20 @@ os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
 #PARAMS
 FLAGS = None
-path = '/home/jacky/Desktop/Spyre/__data/TIMIT/*/*/*'
+path = '/home/jacky/2kx/Spyre/__data/TIMIT/*/*/*'
 num_mfccs = 13
 batchsize = 10
+max_timesteps = 150
+timesteplen = 50
 preprocess = 1
-max_stepsize = 5
-sample_rate = 32000
-num_hidden = 50
+num_hidden = 150
 learning_rate = 1e-2
 momentum = 0.9
 #0th indice + End indice + space + blank label = 28 characters
 num_classes = ord('z') - ord('a') + 4
 
-inputs, labels = data_util.getData(num_examples, num_features, num_classes - 1)
+inputs = []
+labels = []
 
 def preprocess(rawsnd,stdev) :
     """
@@ -55,11 +54,18 @@ init = tf.global_variables_initializer()
 
 # Launch the graph
 with tf.Session() as sess:
-    print('Loading data', end='')
-    loaded = load_dir(path)
-    raw_sound = loaded[0]
+    #Load paths
+    print('Getting Data.',end='')
+    data_util.setParams(batchsize, num_mfccs, num_classes, max_timesteps, timesteplen)
+    dr = data_util.load_dir(path)
+    #Training Loop
+    for i in range(0,4700/batchsize):
+        if i%10 == 0:
+            print('.',end='')
+        print(dr[0][i])
+        data_util.next_Data(i,dr[0][i])
+
     print('Done!')
-    dict = tf_feed.data_loader()
     #print(dict)
     sess.run(init)
     print('Starting Tensorflow session')

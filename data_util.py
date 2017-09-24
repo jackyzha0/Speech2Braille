@@ -1,16 +1,44 @@
 # !/usr/local/bin/python
 from __future__ import print_function
+
+print('Importing libraries... ')
+
 import numpy as np
 import librosa.display as lib_disp
 import librosa.feature as lib_feat
+import tensorflow as tf
+import glob
+import librosa
+
+#PARAMS
+sample_rate = 32000
+batchsize = -1
+num_mfccs = -1
+num_classes = -1
+max_timestepsize = -1
+max_timesteplen = -1
+
+def setParams(_batchsize, _num_mfccs, _num_classes, _max_timesteps, _timesteplen):
+    """Set Training Parameters
+    Args:
+        _batchsize: size of mini batches
+        _num_mfccs: number of mel-spectrum ceptral coefficients to compute
+        _num_classes: total output types - 1
+        _max_timesteps: max timesteps for minibatch/enveloping
+        _timesteplen: max length of timesteps for minibatch/enveloping
+        """
+    batchsize = _batchsize
+    num_mfccs = _num_mfccs
+    num_classes = _num_classes
+    max_timestepsize = _max_timesteps
+    max_timesteplen = _timesteplen
 
 def sparse_tuple_from(sequences, dtype=np.int32):
     """Create a sparse representention of x. For handling one-hot vector
     Args:
         sequences: a list of lists of type dtype where each element is a sequence
     Returns:
-        A tuple with (indices, values, shape)
-    """
+        A tuple with (indices, values, shape)"""
     indices = []
     values = []
 
@@ -25,13 +53,11 @@ def sparse_tuple_from(sequences, dtype=np.int32):
     return indices, values, shape
 
 def features(rawsnd, num) :
-    """
-    Summary:
-        Compute audio features
-    Parameters:
+    """Compute num amount of audio features of a sound
+    Args:
         rawsnd : array with string paths to .wav files
         num : numbers of mfccs to compute
-    Output:
+    Returns:
         Return a (num+28,max_stepsize*32)-dimensional Tensorflow feature vector, and length in
         *num Amount of Mel Frequency Ceptral Coefficients
         *12 Chromagrams
@@ -39,9 +65,8 @@ def features(rawsnd, num) :
         *6 bands of Tonal Centroid Features (Tonnetz)
         *Zero Crossing Rate
         *Spectral Rolloff
-        *Spectral Centroid
-    """
-    x, _ = librosa.load(rawsnd,sr=sample_rate, duration=max_stepsize)
+        *Spectral Centroid"""
+    x, _ = librosa.load(rawsnd,sr=sample_rate, duration=max_timesteplen*max_timestepsize)
     s_tft = np.abs(librosa.stft(x))
     ft = lib_feat.mfcc(y=x, sr=sample_rate, n_mfcc=num)
     ft = np.append(ft,lib_feat.chroma_stft(S=s_tft, sr=sample_rate),axis=0)
@@ -56,25 +81,22 @@ def features(rawsnd, num) :
     return (ft)
 
 def load_dir(fp):
-    """
-    Summary:
-        Load raw paths data into arrays
-    Parameters:
+    """Load raw paths data into arrays
+    Args:
         fp : string path to data
-    Output:
+    Returns:
         Returns array of loaded files
         loaded[0] = sound
         loaded[1] = phonemes
         loaded[2] = words
-        loaded[3] = text
-    """
+        loaded[3] = text"""
     with tf.name_scope('raw_data'):
         ind = 0
         raw_audio = []
         phonemes = []
         words = []
         text = []
-        for __file in glob.iglob(path + '/*.*'):
+        for __file in glob.iglob(fp + '/*.*'):
                 if not ("SA" in __file):
                     ind+=1
                     if (ind%500==0):
@@ -106,7 +128,16 @@ def load_dir(fp):
 def pad_seq():
     return 0
 
-def getData(filepath, minibatch_size, batches ,num_features ,num_classes):
-    """
-    Return training set and validation set (np arrays)
-    """
+def next_Data(index,path):
+    """Returns array of size batchsize with features and labels for training
+    Args:
+        index: current position
+    Returns:
+        features = rank 3 tensor of batchsize * maxsize * num_features
+        """
+    featurearr = features(path, num_mfccs)
+
+    return features
+
+def next_miniBatch(index):
+    return 0
