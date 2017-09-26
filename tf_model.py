@@ -27,7 +27,6 @@ labels = []
 
 def preprocess(rawsnd,stdev) :
     """
-    #INCOMPLETE
     If preprocess == 1, add additional white noise with stdev (default 0.6)
     """
 
