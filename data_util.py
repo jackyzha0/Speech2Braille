@@ -10,7 +10,6 @@ import tensorflow as tf
 import glob
 import librosa
 
-#PARAMS
 sample_rate = 32000
 batchsize = -1
 num_mfccs = -1
@@ -27,6 +26,11 @@ def setParams(_batchsize, _num_mfccs, _num_classes, _max_timesteps, _timesteplen
         _max_timesteps: max timesteps for minibatch/enveloping
         _timesteplen: max length of timesteps for minibatch/enveloping
         """
+    global batchsize
+    global num_mfccs
+    global num_classes
+    global max_timestepsize
+    global max_timesteplen
     batchsize = _batchsize
     num_mfccs = _num_mfccs
     num_classes = _num_classes
@@ -75,7 +79,7 @@ def features(rawsnd, num) :
     ft = np.append(ft,lib_feat.zero_crossing_rate(y=x),axis=0)
     ft = np.append(ft,lib_feat.spectral_rolloff(y=x,sr=sample_rate),axis=0)
     ft = np.append(ft,lib_feat.spectral_centroid(y=x,sr=sample_rate),axis=0)
-    z = np.zeros((num+12+7+6+3,(max_stepsize*((sample_rate/1000)*2))-ft.shape[1]))
+    z = np.zeros((num+12+7+6+3,(max_timestepsize*((sample_rate/1000)*2))-ft.shape[1]))
     ft = np.concatenate((ft,z),axis=1)
     #print(ft[13].astype(np.float16))
     return (ft)
@@ -135,9 +139,13 @@ def next_Data(index,path):
     Returns:
         features = rank 3 tensor of batchsize * maxsize * num_features
         """
-    featurearr = features(path, num_mfccs)
+    featurearr = []
+    featurearr.append(features(path, num_mfccs))
+    return featurearr
 
-    return features
-
-def next_miniBatch(index):
-    return 0
+def next_miniBatch(index,patharr):
+    minibatch = np.array()
+    for j in range(0,batchsize):
+        print(index+j,'/',len(patharr))
+        np.append(minibatch,next_Data(index,patharr[index+j]),axis=0)
+        print(minibatch.shape)

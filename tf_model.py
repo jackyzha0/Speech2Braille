@@ -61,8 +61,7 @@ with tf.Session() as sess:
     for i in range(0,4700/batchsize):
         if i%10 == 0:
             print('.',end='')
-        print(dr[0][i])
-        data_util.next_Data(i,dr[0][i])
+        minibatch = data_util.next_miniBatch(i,dr[0])
 
     print('Done!')
     #print(dict)
