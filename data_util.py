@@ -8,6 +8,7 @@ import librosa.display as lib_disp
 import librosa.feature as lib_feat
 import tensorflow as tf
 import glob
+import time
 import librosa
 
 sample_rate = 32000
@@ -19,7 +20,7 @@ max_timesteplen = -1
 
 def setParams(_batchsize, _num_mfccs, _num_classes, _max_timesteps, _timesteplen):
     """Set Training Parameters
-    Args:
+    Args:+28
         _batchsize: size of mini batches
         _num_mfccs: number of mel-spectrum ceptral coefficients to compute
         _num_classes: total output types - 1
@@ -103,8 +104,6 @@ def load_dir(fp):
         for __file in glob.iglob(fp + '/*.*'):
                 if not ("SA" in __file):
                     ind+=1
-                    if (ind%500==0):
-                        print(".", end='')
                     if (".wav" in __file):
                         raw_audio.append(__file)
                     if (".PHN" in __file):
@@ -129,9 +128,6 @@ def load_dir(fp):
 
         return raw_audio,phonemes,words,text,ind
 
-def pad_seq():
-    return 0
-
 def next_Data(index,path):
     """Returns array of size batchsize with features and labels for training
     Args:
@@ -140,12 +136,13 @@ def next_Data(index,path):
         features = rank 3 tensor of batchsize * maxsize * num_features
         """
     featurearr = []
-    featurearr.append(features(path, num_mfccs))
+    ftrtmp=features(path, num_mfccs)
+    featurearr.append(ftrtmp)
     return featurearr
 
 def next_miniBatch(index,patharr):
-    minibatch = np.array()
+    minibatch = np.array((batchsize,num_mfccs+28,max_timesteplen*max_timestepsize))
     for j in range(0,batchsize):
-        print(index+j,'/',len(patharr))
-        np.append(minibatch,next_Data(index,patharr[index+j]),axis=0)
-        print(minibatch.shape)
+        tmp = minibatch,next_Data(index,patharr[index+j])
+        print(tmp)
+        np.append(minibatch,tmp,axis=0)
