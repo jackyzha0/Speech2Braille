@@ -54,14 +54,14 @@ init = tf.global_variables_initializer()
 # Launch the graph
 with tf.Session() as sess:
     #Load paths
-    print('Getting Data.',end='')
+    print('Getting Data...')
     data_util.setParams(batchsize, num_mfccs, num_classes, max_timesteps, timesteplen)
     dr = data_util.load_dir(path)
+
     #Training Loop
     for i in range(0,4700/batchsize):
-        if i%10 == 0:
-            print('.',end='')
-        minibatch = data_util.next_miniBatch(i,dr[0])
+        print('Loading batch',i)
+        minibatch = data_util.next_miniBatch(i*batchsize,dr[0])
 
     print('Done!')
     #print(dict)
