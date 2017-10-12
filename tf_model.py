@@ -1,13 +1,12 @@
 # !/usr/local/bin/python
 from __future__ import print_function
+import time
+print(time.strftime('[%H:%M:%S]'), 'Starting network... ')
 import tensorflow as tf
 import os
 import sys
-import string
-import numpy as np
 import data_util
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
-
 #PARAMS
 FLAGS = None
 path = '/home/jacky/2kx/Spyre/__data/TIMIT/*/*/*'
@@ -24,6 +23,8 @@ num_classes = ord('z') - ord('a') + 4
 
 inputs = []
 labels = []
+
+print(time.strftime('[%H:%M:%S]'), 'Loading network functions... ')
 
 def preprocess(rawsnd,stdev) :
     """
@@ -54,13 +55,14 @@ init = tf.global_variables_initializer()
 # Launch the graph
 with tf.Session() as sess:
     #Load paths
-    print('Getting Data...')
+    print(time.strftime('[%H:%M:%S]'), 'Passing params... ')
     data_util.setParams(batchsize, num_mfccs, num_classes, max_timesteps, timesteplen)
+    print(time.strftime('[%H:%M:%S]'), 'Passing directory... ')
     dr = data_util.load_dir(path)
 
     #Training Loop
     for i in range(0,4700/batchsize):
-        print('Loading batch',i)
+        print(time.strftime('[%H:%M:%S]'),'Loading batch',i)
         minibatch = data_util.next_miniBatch(i*batchsize,dr[0])
 
     print('Done!')

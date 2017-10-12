@@ -1,15 +1,20 @@
 # !/usr/local/bin/python
 from __future__ import print_function
 
-print('Importing libraries... ')
-
+import time
+print(time.strftime('[%H:%M:%S]'), 'Starting data loader... ')
+print(time.strftime('[%H:%M:%S]'), 'Importing libraries... ')
 import numpy as np
+print('[OK] numpy ')
 import librosa.display as lib_disp
 import librosa.feature as lib_feat
-import tensorflow as tf
-import glob
-import time
 import librosa
+print('[OK] librosa ')
+import tensorflow as tf
+print('[OK] tensorflow ')
+import glob
+print('[OK] glob ')
+
 
 sample_rate = 32000
 batchsize = -1
@@ -17,6 +22,8 @@ num_mfccs = -1
 num_classes = -1
 max_timestepsize = -1
 max_timesteplen = -1
+
+print(time.strftime('[%H:%M:%S]'), 'Loading helper functions...')
 
 def setParams(_batchsize, _num_mfccs, _num_classes, _max_timesteps, _timesteplen):
     """Set Training Parameters
@@ -69,7 +76,7 @@ def features(rawsnd, num) :
         *7 bands of Spectral Contrast
         *6 bands of Tonal Centroid Features (Tonnetz)
         *Zero Crossing Rate
-        *Spectral Rolloff
+        *Spectral Rolloffprint(time.strftime('[%H:%M:%S]'), 'Loading helper functions...')
         *Spectral Centroid"""
     x, _ = librosa.load(rawsnd,sr=sample_rate, duration=max_timesteplen*max_timestepsize)
     s_tft = np.abs(librosa.stft(x))
@@ -128,21 +135,30 @@ def load_dir(fp):
 
         return raw_audio,phonemes,words,text,ind
 
-def next_Data(index,path):
-    """Returns array of size batchsize with features and labels for training
+def next_Data(path):
+    """Returns array of features for training
     Args:
-        index: current position
+        path: path to audio file to compute
     Returns:
-        features = rank 3 tensor of batchsize * maxsize * num_features
-        """
+        features = rank 2 tensor of maxsize * num_features
+    """
     featurearr = []
     ftrtmp=features(path, num_mfccs)
     featurearr.append(ftrtmp)
     return featurearr
 
 def next_miniBatch(index,patharr):
-    minibatch = np.array((batchsize,num_mfccs+28,max_timesteplen*max_timestepsize))
+    """Returns array of size batchsize with features for training
+    Args:
+        index: current position in training
+    Returns:
+        features = rank 3 tensor of batchsize * maxsize * num_features
+    """
+    minibatch = []
     for j in range(0,batchsize):
-        tmp = minibatch,next_Data(index,patharr[index+j])
-        print(tmp)
-        np.append(minibatch,tmp,axis=0)
+        tmp = next_Data(patharr[index+j])
+        minibatch.append(np.array(tmp[0]))
+        print('Passed tensor with rank...',np.array(tmp[0]).shape,j+1,'/',batchsize)
+    minibatch = np.array(minibatch)
+    print(time.strftime('[%H:%M:%S]'), 'Succesfully loaded minibatch of size',minibatch.ndim)
+    return minibatch
