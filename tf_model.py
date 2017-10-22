@@ -26,6 +26,27 @@ labels = []
 
 print(time.strftime('[%H:%M:%S]'), 'Loading network functions... ')
 
+#Add sumaries to TensorBoard for weights and biases
+def var_summaries(var):
+    with tf.name_scope('summary'):
+        mean = tf.reduce_mean(var)
+        tf.summary.scalar('mean', mean)
+        with tf.name_scope('stddev'):
+            stddev = tf.sqrt(tf.reduce_mean(tf.square(var - mean)))
+            tf.summary.scalar('stddev', stddev)
+            tf.summary.scalar('max', tf.reduce_max(var))
+            tf.summary.scalar('min', tf.reduce_min(var))
+            tf.summary.histogram('histogram', var)
+
+# tf Graph input
+input_vector = tf.placeholder("float", [None, n_steps, n_input])
+y = tf.placeholder("float", [None, n_classtypes])
+
+weights = tf.Variable(tf.random_normal([2*n_hidden, n_classtypes]))
+biases = tf.Variable(tf.random_normal([n_classtypes]))
+var_summaries(weights)
+var_summaries(biases)
+
 def preprocess(rawsnd,stdev) :
     """
     If preprocess == 1, add additional white noise with stdev (default 0.6)
@@ -49,6 +70,12 @@ def BiRNN(x, weights, biases):
 
     # Linear activation, using rnn inner loop last output
     return tf.matmul(outputs[-1], weights['out']) + biases['out']
+
+pred = BiRNN(input_vector, weights, biases)
+
+graph = tf.Graph()
+with graph.as_default():
+    inputs = tf.placeholder(tf.float32, [batchsize, max_timesteplen*max_timestepsize, num_features])
 
 init = tf.global_variables_initializer()
 
