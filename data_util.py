@@ -76,7 +76,7 @@ def features(rawsnd, num) :
         *7 bands of Spectral Contrast
         *6 bands of Tonal Centroid Features (Tonnetz)
         *Zero Crossing Rate
-        *Spectral Rolloffprint(time.strftime('[%H:%M:%S]'), 'Loading helper functions...')
+        *Spectral Rolloffprint
         *Spectral Centroid"""
     x, _ = librosa.load(rawsnd,sr=sample_rate, duration=max_timesteplen*max_timestepsize)
     s_tft = np.abs(librosa.stft(x))
@@ -160,5 +160,5 @@ def next_miniBatch(index,patharr):
         minibatch.append(np.array(tmp[0]))
         print('Passed tensor with rank...',np.array(tmp[0]).shape,j+1,'/',batchsize)
     minibatch = np.array(minibatch)
-    print(time.strftime('[%H:%M:%S]'), 'Succesfully loaded minibatch of size',minibatch.ndim)
+    print(time.strftime('[%H:%M:%S]'), 'Succesfully loaded minibatch of rank',minibatch.ndim)
     return minibatch
