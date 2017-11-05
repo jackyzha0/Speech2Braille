@@ -18,11 +18,9 @@ preprocess = 1
 num_hidden = 150
 learning_rate = 1e-2
 momentum = 0.9
+num_hiddenlayers = 5
 #0th indice + End indice + space + blank label = 28 characters
 num_classes = ord('z') - ord('a') + 4
-
-inputs = []
-labels = []
 
 print(time.strftime('[%H:%M:%S]'), 'Loading network functions... ')
 
@@ -39,48 +37,43 @@ def var_summaries(var):
             tf.summary.histogram('histogram', var)
 
 # tf Graph input
-input_vector = tf.placeholder("float", [None, n_steps, n_input])
-y = tf.placeholder("float", [None, n_classtypes])
+input_vector = tf.placeholder("float", [batchsize, max_timesteps, num_mfccs+28])
+print(input_vector.shape)
+y = tf.placeholder("float", [None, num_classes])
 
-weights = tf.Variable(tf.random_normal([2*n_hidden, n_classtypes]))
-biases = tf.Variable(tf.random_normal([n_classtypes]))
-var_summaries(weights)
-var_summaries(biases)
+weights = tf.Variable(tf.random_normal([2*num_hiddenlayers, num_classes]))
+biases = tf.Variable(tf.random_normal([num_classes]))
 
 def preprocess(rawsnd,stdev) :
     """
     If preprocess == 1, add additional white noise with stdev (default 0.6)
     """
 
-def BiRNN(x, weights, biases):
-    """
-    #Prepare data shape to match `bidirectional_rnn` function requirements
-    # Current data input shape: (batch_size, n_steps, n_input)
-    # Required shape: 'n_steps' tensors list of shape (batch_size, n_input)
-    """
-    # Unstack to get a list of 'n_steps' tensors of shape (batch_size, n_input)
-    x = tf.unstack(x, n_steps, 1)
-
-    # Define lstm cells with tensorflow
-    # Forward direction cell
-    lstm_fw_cell = rnn.BasicLSTMCell(n_hidden, forget_bias=1.0)
-    # Backward direction cell
-    lstm_bw_cell = rnn.BasicLSTMCell(n_hidden, forget_bias=1.0)
-    outputs = rnn.static_bidirectional_rnn(lstm_fw_cell, lstm_bw_cell, x, dtype=tf.float32)
-
-    # Linear activation, using rnn inner loop last output
-    return tf.matmul(outputs[-1], weights['out']) + biases['out']
-
-pred = BiRNN(input_vector, weights, biases)
-
 graph = tf.Graph()
 with graph.as_default():
     inputs = tf.placeholder(tf.float32, [batchsize, max_timesteplen*max_timestepsize, num_features])
-
-init = tf.global_variables_initializer()
+    targets = tf.sparse_placeholder(tf.int32)
+    seq_len = tf.placeholder(tf.int32, [None])
+    cell = tf.contrib.rnn.LSTMCell(num_hidden, state_is_tuple=True)
+    stack = tf.contrib.rnn.MultiRNNCell([cell] * num_layers, state_is_tuple=True)
+    outputs, _ = tf.nn.dynamic_rnn(stack, inputs, seq_len, dtype=tf.float32)
+    shape = tf.shape(inputs)
+    batch_s, max_timesteps = shape[0], shape[1]
+    outputs = tf.reshape(outputs, [-1, num_hidden])
+    W = tf.Variable(tf.truncated_normal([num_hidden,num_classes],stddev=0.1))
+    b = tf.Variable(tf.constant(0., shape=[num_classes]))
+    logits = tf.matmul(outputs, W) + b
+    logits = tf.transpose(logits, (1, 0, 2))
+    loss = tf.nn.ctc_loss(targets, logits, seq_len)
+    cost = tf.reduce_mean(loss)
+    optimizer = tf.train.MomentumOptimizer(initial_learning_rate,0.9).minimize(cost)
+    decoded, log_prob = tf.nn.ctc_greedy_decoder(logits, seq_len)
+    ler = tf.reduce_mean(tf.edit_distance(tf.cast(decoded[0], tf.int32),targets))
 
 # Launch the graph
 with tf.Session() as sess:
+    tf.global_variables_initializer().run()
+
     #Load paths
     print(time.strftime('[%H:%M:%S]'), 'Passing params... ')
     data_util.setParams(batchsize, num_mfccs, num_classes, max_timesteps, timesteplen)
@@ -91,13 +84,32 @@ with tf.Session() as sess:
     for i in range(0,4700/batchsize):
         print(time.strftime('[%H:%M:%S]'),'Loading batch',i)
         minibatch = data_util.next_miniBatch(i*batchsize,dr[0])
+        for j in range(0,batchsize):
+            #FIX TARGETS
+            batch_train_targets = sparse_tuple_from(<targets>[j])
+            batch_train_inputs = train_inputs[indexes]
+            feed = {inputs: batch_train_inputs, targets: batch_train_targets, seq_len: batch_train_seq_len}
 
+            #Batch
+            batch_cost, _ = session.run([cost, optimizer], feed)
+            train_cost += batch_cost*batch_size
+            train_ler += session.run(ler, feed_dict=feed)*batch_size
+        train_cost /= num_examples
+        train_ler /= num_examples
+        log = "Epoch {}/{}, train_cost = {:.3f}, train_ler = {:.3f}, time = {:.3f}"
+        print(log.format(curr_epoch+1, num_epochs, train_cost, train_ler, time.time() - start))
+
+    #Decoding
+    batch_train_inputs, batch_train_seq_len = pad_sequences(train_inputs)
+    batch_train_targets = sparse_tuple_from(train_targets)
+    feed = {inputs: batch_train_inputs, targets: batch_train_targets, seq_len: batch_train_seq_len}
+    d = session.run(decoded[0], feed_dict=feed)
+    dense_decoded = tf.sparse_tensor_to_dense(d, default_value=-1).eval(session=session)
+    for i, seq in enumerate(dense_decoded):
+
+        seq = [s for s in seq if s != -1]
+
+        print('Sequence %d' % i)
+        print('\t Original:\n%s' % train_targets[i])
+        print('\t Decoded:\n%s' % seq)
     print('Done!')
-    #print(dict)
-    sess.run(init)
-    print('Starting Tensorflow session')
-    features_placeholder = tf.placeholder(tf.float32, shape=(None, num_mfccs+4))
-    labels_placeholder = tf.placeholder(tf.string, shape=(batchsize))
-
-    #train
-    #eval
