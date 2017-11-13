@@ -64,6 +64,9 @@ def sparse_tuple_from(sequences, dtype=np.int32):
 
     return indices, values, shape
 
+def readlabels(file):
+    print("ok")
+
 def features(rawsnd, num) :
     """Compute num amount of audio features of a sound
     Args:
