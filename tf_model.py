@@ -18,7 +18,7 @@ preprocess = 1
 num_hidden = 150
 learning_rate = 1e-2
 momentum = 0.9
-num_hiddenlayers = 5
+num_layers = 1
 #0th indice + End indice + space + blank label = 28 characters
 num_classes = ord('z') - ord('a') + 4
 
@@ -43,27 +43,55 @@ def preprocess(rawsnd,stdev) :
 
 graph = tf.Graph()
 with graph.as_default():
-    # tf Graph input
-    input_vector = tf.placeholder("float", [batchsize, max_timesteps*timesteplen, num_mfccs+28])
-    y = tf.placeholder("float", [None, num_classes])
+    # e.g: log filter bank or MFCC features
+    # Has size [batch_size, max_stepsize, num_features], but the
+    # batch_size and max_stepsize can vary along each step
+    inputs = tf.placeholder(tf.float32, [None, None, num_mfccs+28])
 
-    weights = tf.Variable(tf.random_normal([2*num_hiddenlayers, num_classes]))
-    biases = tf.Variable(tf.random_normal([num_classes]))
+    # Here we use sparse_placeholder that will generate a
+    # SparseTensor required by ctc_loss op.
+    targets = tf.sparse_placeholder(tf.int32)
 
-    seq_len = tf.placeholder(tf.int32, [batchsize])
-    cell = tf.contrib.rnn.LSTMCell(150, state_is_tuple=True)
-    stack = tf.contrib.rnn.MultiRNNCell([cell] * 5, state_is_tuple=True)
-    outputs, _ = tf.nn.dynamic_rnn(stack, input_vector, seq_len, dtype=tf.float32)
-    shape = tf.shape(input_vector)
+    # 1d array of size [batch_size]
+    seq_len = tf.placeholder(tf.int32, [None])
+
+    cell = tf.contrib.rnn.LSTMCell(num_hidden, state_is_tuple=True)
+
+    # Stacking rnn cells
+    stack = tf.contrib.rnn.MultiRNNCell([cell] * num_layers,state_is_tuple=True)
+
+    # The second output is the last state and we will no use that
+    outputs, _ = tf.nn.dynamic_rnn(stack, inputs, seq_len, dtype=tf.float32)
+
+    shape = tf.shape(inputs)
     batch_s, max_timesteps = shape[0], shape[1]
+
+    # Reshaping to apply the same weights over the timesteps
     outputs = tf.reshape(outputs, [-1, num_hidden])
-    logits = tf.matmul(outputs, weights) + biases
+
+    W = tf.Variable(tf.truncated_normal([num_hidden,num_classes],stddev=0.1))
+    # Zero initialization
+    # Tip: Is tf.zeros_initializer the same?
+    b = tf.Variable(tf.constant(0., shape=[num_classes]))
+
+    # Doing the affine projection
+    logits = tf.matmul(outputs, W) + b
+
+    # Reshaping back to the original shape
+    logits = tf.reshape(logits, [batch_s, -1, num_classes])
+
+    # Time major
     logits = tf.transpose(logits, (1, 0, 2))
-    loss = tf.nn.ctc_loss(y, logits, seq_len)
+
+    loss = tf.nn.ctc_loss(targets, logits, seq_len)
     cost = tf.reduce_mean(loss)
-    optimizer = tf.train.MomentumOptimizer(initial_learning_rate,0.9).minimize(cost)
+
+    optimizer = tf.train.MomentumOptimizer(learning_rate,
+                                           0.9).minimize(cost)
+
     decoded, log_prob = tf.nn.ctc_greedy_decoder(logits, seq_len)
-    ler = tf.reduce_mean(tf.edit_distance(tf.cast(decoded[0], tf.int32),y))
+
+    ler = tf.reduce_mean(tf.edit_distance(tf.cast(decoded[0], tf.int32),targets))
 
 # Launch the graph
 with tf.Session() as sess:
@@ -75,7 +103,6 @@ with tf.Session() as sess:
     print(time.strftime('[%H:%M:%S]'), 'Passing directory... ')
     dr = data_util.load_dir(path)
     lr = dr[1]
-    print(lr)
     #Training Loop
     for i in range(0,4700/batchsize):
         print(time.strftime('[%H:%M:%S]'),'Loading batch',i)
