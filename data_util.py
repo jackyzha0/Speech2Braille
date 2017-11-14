@@ -92,7 +92,6 @@ def features(rawsnd, num) :
     ft = np.append(ft,lib_feat.spectral_centroid(y=x,sr=sample_rate),axis=0)
     z = np.zeros((num+12+7+6+3,(max_timestepsize*((sample_rate/1000)*2))-ft.shape[1]))
     ft = np.concatenate((ft,z),axis=1)
-    #print(ft[13].astype(np.float16))
     return (ft)
 
 def load_dir(fp):
@@ -146,6 +145,7 @@ def next_Data(path):
         features = rank 2 tensor of maxsize * num_features
     """
     featurearr = []
+    print(path,num_mfccs)
     ftrtmp=features(path, num_mfccs)
     featurearr.append(ftrtmp)
     return featurearr
