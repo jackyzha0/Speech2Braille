@@ -100,7 +100,7 @@ with tf.Session() as sess:
     #Load paths
     print(time.strftime('[%H:%M:%S]'), 'Passing params... ')
     data_util.setParams(batchsize, num_mfccs, num_classes, max_timesteps, timesteplen)
-    print(time.strftime('[%H:%M:%S]'), 'Passing directory... ')
+    print(time.strftime('[%H:%M:%S]'), 'Parsing directory... ')
     dr = data_util.load_dir(path)
     lr = dr[1]
     #Training Loop

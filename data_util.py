@@ -79,7 +79,7 @@ def features(rawsnd, num) :
         *7 bands of Spectral Contrast
         *6 bands of Tonal Centroid Features (Tonnetz)
         *Zero Crossing Rate
-        *Spectral Rolloffprint
+        *Spectral Rolloff
         *Spectral Centroid"""
     x, _ = librosa.load(rawsnd,sr=sample_rate, duration=max_timesteplen*max_timestepsize)
     s_tft = np.abs(librosa.stft(x))
@@ -142,7 +142,7 @@ def next_Data(path):
     Args:
         path: path to audio file to compute
     Returns:
-        features = rank 2 tensor of maxsize * num_features
+        features = rank 2 tensor of maxsize * num_features+28
     """
     featurearr = []
     print(path,num_mfccs)
@@ -155,7 +155,7 @@ def next_miniBatch(index,patharr):
     Args:
         index: current position in training
     Returns:
-        features = rank 3 tensor of batchsize * maxsize * num_features
+        features = rank 3 tensor of batchsize * maxsize * num_features+28
     """
     minibatch = []
     for j in range(0,batchsize):
