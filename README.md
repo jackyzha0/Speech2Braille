@@ -13,6 +13,6 @@ Features + Zero Crossing Rate + Spectral Rolloff + Spectral Centroid
 * BLSTM Network Dimensions
 * Learning Rate = 1e-2
 * Momentum = 0.9
-* Number of Hidden Layers = 4
+* Number of Hidden Layers = 150
 * Network Depth = 2
 * CTC Loss and Decoder

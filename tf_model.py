@@ -18,7 +18,7 @@ preprocess = 1
 num_hidden = 150
 learning_rate = 1e-2
 momentum = 0.9
-num_layers = 1
+num_layers = 2
 #0th indice + End indice + space + blank label = 28 characters
 num_classes = ord('z') - ord('a') + 4
 
@@ -41,8 +41,11 @@ def preprocess(rawsnd,stdev) :
     If preprocess == 1, add additional white noise with stdev (default 0.6)
     """
 
+
 graph = tf.Graph()
 with graph.as_default():
+    def lstm_cell():
+      return tf.contrib.rnn.BasicLSTMCell(num_hidden)
     # e.g: log filter bank or MFCC features
     # Has size [batch_size, max_stepsize, num_features], but the
     # batch_size and max_stepsize can vary along each step
@@ -55,16 +58,14 @@ with graph.as_default():
     # 1d array of size [batch_size]
     seq_len = tf.placeholder(tf.int32, [None])
 
-    cell = tf.contrib.rnn.LSTMCell(num_hidden, state_is_tuple=True)
-
     # Stacking rnn cells
-    stack = tf.contrib.rnn.MultiRNNCell([cell] * num_layers,state_is_tuple=True)
+    stack = tf.contrib.rnn.MultiRNNCell([lstm_cell() for _ in range(num_layers)])
 
     # The second output is the last state and we will no use that
     outputs, _ = tf.nn.dynamic_rnn(stack, inputs, seq_len, dtype=tf.float32)
 
     shape = tf.shape(inputs)
-    batch_s, max_timesteps = shape[0], shape[1]
+    batch_s, TF_max_timesteps = shape[0], shape[1]
 
     # Reshaping to apply the same weights over the timesteps
     outputs = tf.reshape(outputs, [-1, num_hidden])
@@ -109,7 +110,8 @@ with tf.Session() as sess:
         minibatch = data_util.next_miniBatch(i*batchsize,dr[0])
         for j in range(0,batchsize):
             #FIX TARGETS
-            batch_train_targets = sparse_tuple_from(targets[j])
+            print(targets)
+            batch_train_targets = data_util.sparse_tuple_from(targets[j])
             batch_train_inputs = minibatch[indexes]
             feed = {inputs: batch_train_inputs, targets: batch_train_targets, seq_len: batch_train_seq_len}
 

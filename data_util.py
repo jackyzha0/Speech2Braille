@@ -16,7 +16,7 @@ import glob
 print('[OK] glob ')
 
 
-sample_rate = 32000
+sample_rate = 16000
 batchsize = -1
 num_mfccs = -1
 num_classes = -1
@@ -145,7 +145,6 @@ def next_Data(path):
         features = rank 2 tensor of maxsize * num_features+28
     """
     featurearr = []
-    print(path,num_mfccs)
     ftrtmp=features(path, num_mfccs)
     featurearr.append(ftrtmp)
     return featurearr
