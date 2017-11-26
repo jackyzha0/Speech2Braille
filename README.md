@@ -15,4 +15,4 @@ Features + Zero Crossing Rate + Spectral Rolloff + Spectral Centroid]
 * Momentum = 0.9
 * Number of Hidden Layers = 4
 * Network Depth = 2
-[CTC Loss and Decoder]
+* CTC Loss and Decoder
