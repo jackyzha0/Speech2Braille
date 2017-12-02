@@ -46,6 +46,8 @@ graph = tf.Graph()
 with graph.as_default():
     def lstm_cell():
       return tf.contrib.rnn.BasicLSTMCell(num_hidden)
+
+    #Network Code is heavily influenced by igormq's ctc_tensorflow example
     # e.g: log filter bank or MFCC features
     # Has size [batch_size, max_stepsize, num_features], but the
     # batch_size and max_stepsize can vary along each step
@@ -61,7 +63,7 @@ with graph.as_default():
     # Stacking rnn cells
     stack = tf.contrib.rnn.MultiRNNCell([lstm_cell() for _ in range(num_layers)])
 
-    # The second output is the last state and we will no use that
+    # The second output is the last state and we will not use that
     outputs, _ = tf.nn.dynamic_rnn(stack, inputs, seq_len, dtype=tf.float32)
 
     shape = tf.shape(inputs)
@@ -87,8 +89,7 @@ with graph.as_default():
     loss = tf.nn.ctc_loss(targets, logits, seq_len)
     cost = tf.reduce_mean(loss)
 
-    optimizer = tf.train.MomentumOptimizer(learning_rate,
-                                           0.9).minimize(cost)
+    optimizer = tf.train.MomentumOptimizer(learning_rate,0.9).minimize(cost)
 
     decoded, log_prob = tf.nn.ctc_greedy_decoder(logits, seq_len)
 
@@ -108,10 +109,11 @@ with tf.Session() as sess:
     for i in range(0,4700/batchsize):
         print(time.strftime('[%H:%M:%S]'),'Loading batch',i)
         minibatch = data_util.next_miniBatch(i*batchsize,dr[0])
+        minibatch_targets = data_util.next_target_miniBatch(i*batchsize,dr[1])
+        #print(minibatch,minibatch_targets)
         for j in range(0,batchsize):
-            #FIX TARGETS
-            print(targets)
-            batch_train_targets = data_util.sparse_tuple_from(targets[j])
+            print
+            batch_train_targets = data_util.sparse_tuple_from(minibatch_targets[j])
             batch_train_inputs = minibatch[indexes]
             feed = {inputs: batch_train_inputs, targets: batch_train_targets, seq_len: batch_train_seq_len}
 

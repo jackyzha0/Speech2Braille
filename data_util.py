@@ -22,6 +22,16 @@ num_mfccs = -1
 num_classes = -1
 max_timestepsize = -1
 max_timesteplen = -1
+path_phonetable = '/home/jacky/2kx/Spyre/git/phon_table.txt'
+
+print(time.strftime('[%H:%M:%S]'), 'Constructing Phone Conversion Table...')
+with open(path_phonetable) as f:
+    phn_lookup = []
+    for line in f:
+        tmp_phn = line.split("\n")[0]
+        phn_lookup.append(tmp_phn)
+    print(phn_lookup)
+print(time.strftime('[%H:%M:%S]'),'Loaded phone table')
 
 print(time.strftime('[%H:%M:%S]'), 'Loading helper functions...')
 
@@ -64,9 +74,6 @@ def sparse_tuple_from(sequences, dtype=np.int32):
 
     return indices, values, shape
 
-def readlabels(file):
-    print("ok")
-
 def features(rawsnd, num) :
     """Compute num amount of audio features of a sound
     Args:
@@ -94,6 +101,9 @@ def features(rawsnd, num) :
     ft = np.concatenate((ft,z),axis=1)
     return (ft)
 
+def phn_to_int(inp):
+    return phn_lookup.index(inp)
+
 def load_dir(fp):
     """Load raw paths data into arrays
     Args:
@@ -120,7 +130,9 @@ def load_dir(fp):
                             tmp_phn_file = []
                             for line in f:
                                 tmp_phn = line.split(" ")
+                                tmp_phn[2] = phn_to_int(tmp_phn[2][:-1])
                                 tmp_phn_file.append(tmp_phn)
+                        #print(time.strftime('[%H:%M:%S]'),'Phone file',__file[35:],'loaded, size',len(tmp_phn_file))
                         phonemes.append(tmp_phn_file)
                     if (".WRD" in __file):
                         with open(__file) as f:
@@ -163,4 +175,8 @@ def next_miniBatch(index,patharr):
         print('Passed tensor with rank...',np.array(tmp[0]).shape,j+1,'/',batchsize)
     minibatch = np.array(minibatch)
     print(time.strftime('[%H:%M:%S]'), 'Succesfully loaded minibatch of rank',minibatch.ndim)
+    return minibatch
+def next_target_miniBatch(index,patharr):
+    print(patharr[index])
+    minibatch = []
     return minibatch
