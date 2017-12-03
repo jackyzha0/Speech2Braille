@@ -112,15 +112,15 @@ with tf.Session() as sess:
         minibatch_targets = data_util.next_target_miniBatch(i*batchsize,dr[1])
         #print(minibatch,minibatch_targets)
         for j in range(0,batchsize):
-            print
+            indexes = [i % batchsize for i in range(j * batchsize, (j + 1) * batchsize)]
             batch_train_targets = data_util.sparse_tuple_from(minibatch_targets[j])
             batch_train_inputs = minibatch[indexes]
-            feed = {inputs: batch_train_inputs, targets: batch_train_targets, seq_len: batch_train_seq_len}
+            feed = {inputs: batch_train_inputs, targets: batch_train_targets}
 
             #Batch
-            batch_cost, _ = session.run([cost, optimizer], feed)
+            batch_cost, _ = sess.run([cost, optimizer], feed)
             train_cost += batch_cost*batch_size
-            train_ler += session.run(ler, feed_dict=feed)*batch_size
+            train_ler += sess.run(ler, feed_dict=feed)*batch_size
         train_cost /= num_examples
         train_ler /= num_examples
         log = "Epoch {}/{}, train_cost = {:.3f}, train_ler = {:.3f}, time = {:.3f}"
