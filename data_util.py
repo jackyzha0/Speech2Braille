@@ -172,11 +172,14 @@ def next_miniBatch(index,patharr):
     for j in range(0,batchsize):
         tmp = next_Data(patharr[index+j])
         minibatch.append(np.array(tmp[0]))
-        print('Passed tensor with rank...',np.array(tmp[0]).shape,j+1,'/',batchsize)
+        print(time.strftime('[%H:%M:%S]'), 'Passed input tensor with rank...',np.array(tmp[0]).shape,j+1,'/',batchsize)
     minibatch = np.array(minibatch)
     print(time.strftime('[%H:%M:%S]'), 'Succesfully loaded minibatch of rank',minibatch.ndim)
     return minibatch
 def next_target_miniBatch(index,patharr):
-    print(patharr[index])
     minibatch = []
+    for j in range(0,batchsize):
+        tmp = patharr[index+j]
+        minibatch.append(np.array(tmp[0]))
+        print(time.strftime('[%H:%M:%S]'), 'Passed target tensor with rank...',np.array(tmp).shape,j+1,'/',batchsize)
     return minibatch
