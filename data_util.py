@@ -132,7 +132,7 @@ def load_dir(fp):
                                 tmp_phn = line.split(" ")
                                 tmp_phn[2] = phn_to_int(tmp_phn[2][:-1])
                                 tmp_phn_file.append(tmp_phn)
-                        #print(time.strftime('[%H:%M:%S]'),'Phone file',__file[35:],'loaded, size',len(tmp_phn_file))
+                        print(time.strftime('[%H:%M:%S]'),'Phone file',__file[35:],'loaded, size',len(tmp_phn_file))
                         phonemes.append(tmp_phn_file)
                     if (".WRD" in __file):
                         with open(__file) as f:
@@ -146,7 +146,8 @@ def load_dir(fp):
                             for line in f:
                                 res = ''.join([i for i in line if not i.isdigit()])
                         text.append(res)
-
+        print(raw_audio)
+        print(time.strftime('[%H:%M:%S]'), 'Succesfully data set of size',len(raw_audio))
         return raw_audio,phonemes,words,text,ind
 
 def next_Data(path):
@@ -174,6 +175,7 @@ def next_miniBatch(index,patharr):
         minibatch.append(np.array(tmp[0]))
         print(time.strftime('[%H:%M:%S]'), 'Passed input tensor with rank...',np.array(tmp[0]).shape,j+1,'/',batchsize)
     minibatch = np.array(minibatch)
+    minibatch = np.swapaxes(minibatch,2,1)
     print(time.strftime('[%H:%M:%S]'), 'Succesfully loaded minibatch of rank',minibatch.ndim)
     return minibatch
 def next_target_miniBatch(index,patharr):

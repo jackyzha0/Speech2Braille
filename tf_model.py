@@ -10,9 +10,10 @@ import numpy as np
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 #PARAMS
 FLAGS = None
-path = '/home/jacky/2kx/Spyre/__data/TIMIT/*/*/*'
+#path = '/home/jacky/2kx/Spyre/__data/TIMIT/*/*/*'
+path = '/home/jacky/2kx/Spyre/pract_data/*'
 num_mfccs = 13
-batchsize = 10
+batchsize = 8
 max_timesteps = 150
 timesteplen = 50
 preprocess = 1
@@ -49,7 +50,6 @@ with graph.as_default():
       return tf.contrib.rnn.BasicLSTMCell(num_hidden)
 
     #Network Code is heavily influenced by igormq's ctc_tensorflow example
-    # e.g: log filter bank or MFCC features
     # Has size [batch_size, max_stepsize, num_features], but the
     # batch_size and max_stepsize can vary along each step
     inputs = tf.placeholder(tf.float32, [None, None, num_mfccs+28])
@@ -166,27 +166,25 @@ with tf.Session(graph=graph) as sess:
     dr = data_util.load_dir(path)
     lr = dr[1]
     #Training Loop
+    train_cost = train_ler = 0
+    start = time.time()
     for i in range(0,4700/batchsize):
         print(time.strftime('[%H:%M:%S]'),'Loading batch',i)
         minibatch = data_util.next_miniBatch(i*batchsize,dr[0])
         minibatch_targets = data_util.next_target_miniBatch(i*batchsize,dr[1])
-        #print(minibatch,minibatch_targets)
-        for j in range(0,batchsize):
-            indexes = [i % batchsize for i in range(j * batchsize, (j + 1) * batchsize)]
-            batch_train_targets = data_util.sparse_tuple_from(minibatch_targets[j])
-            batch_train_inputs = minibatch[indexes]
-            print(batch_train_inputs.shape)
-            batch_train_inputs, batch_train_seq_len = pad_sequences(batch_train_inputs)
-            feed = {inputs: batch_train_inputs, targets: batch_train_targets, seq_len: batch_train_seq_len}
-
-            #Batch
-            batch_cost, _ = sess.run([cost, optimizer], feed)
-            train_cost += batch_cost*batch_size
-            train_ler += sess.run(ler, feed_dict=feed)*batch_size
-        train_cost /= num_examples
-        train_ler /= num_examples
-        log = "Epoch {}/{}, train_cost = {:.3f}, train_ler = {:.3f}, time = {:.3f}"
-        print(log.format(curr_epoch+1, num_epochs, train_cost, train_ler, time.time() - start))
+        indexes = [j % batchsize for j in range(i * batchsize, (i + 1) * batchsize)]
+        batch_train_targets = data_util.sparse_tuple_from(minibatch_targets)
+        batch_train_inputs = minibatch[indexes]
+        batch_train_inputs, batch_train_seq_len = pad_sequences(batch_train_inputs)
+        feed = {inputs: batch_train_inputs, targets: batch_train_targets, seq_len: batch_train_seq_len}
+        #Batch
+        batch_cost, _ = sess.run([cost, optimizer], feed)
+        train_cost += batch_cost*batchsize
+    train_ler += sess.run(ler, feed_dict=feed)*batch_size
+    train_cost /= num_examples
+    train_ler /= num_examples
+    log = "Epoch {}/{}, train_cost = {:.3f}, train_ler = {:.3f}, time = {:.3f}"
+    print(log.format(curr_epoch+1, num_epochs, train_cost, train_ler, time.time() - start))
 
     #Decoding
     feed = {inputs: batch_train_inputs, targets: batch_train_targets, seq_len: batch_train_seq_len}
