@@ -164,12 +164,13 @@ with tf.Session(graph=graph) as sess:
     data_util.setParams(batchsize, num_mfccs, num_classes, max_timesteps, timesteplen)
     print(time.strftime('[%H:%M:%S]'), 'Parsing directory... ')
     dr = data_util.load_dir(path)
+    datasetsize = len(dr[0])
     lr = dr[1]
     #Training Loop
     train_cost = train_ler = 0
-    start = time.time()
-    for i in range(0,4700/batchsize):
-        print(time.strftime('[%H:%M:%S]'),'Loading batch',i)
+    start = prev = time.time()
+    for i in range(0,datasetsize/batchsize):
+        print(time.strftime('[%H:%M:%S]'),'Training batch',i)
         minibatch = data_util.next_miniBatch(i*batchsize,dr[0])
         minibatch_targets = data_util.next_target_miniBatch(i*batchsize,dr[1])
         indexes = [j % batchsize for j in range(i * batchsize, (i + 1) * batchsize)]
@@ -180,16 +181,19 @@ with tf.Session(graph=graph) as sess:
         #Batch
         batch_cost, _ = sess.run([cost, optimizer], feed)
         train_cost += batch_cost*batchsize
-    train_ler += sess.run(ler, feed_dict=feed)*batch_size
-    train_cost /= num_examples
-    train_ler /= num_examples
-    log = "Epoch {}/{}, train_cost = {:.3f}, train_ler = {:.3f}, time = {:.3f}"
-    print(log.format(curr_epoch+1, num_epochs, train_cost, train_ler, time.time() - start))
+        time_fm = "{:.4f} seconds"
+        print(time.strftime('[%H:%M:%S]'),'Batch',i,'trained in',time_fm.format(time.time()-prev))
+        prev = time.time()
+    train_ler += sess.run(ler, feed_dict=feed)*batchsize
+    train_cost /= datasetsize
+    train_ler /= datasetsize
+    log = "Cost: {:.3f}, Label Error Rate: {:.3f}, Time taken: {:.3f}"
+    print(time.strftime('[%H:%M:%S]'),log.format(train_cost, train_ler, time.time() - start))
 
     #Decoding
     feed = {inputs: batch_train_inputs, targets: batch_train_targets, seq_len: batch_train_seq_len}
-    d = session.run(decoded[0], feed_dict=feed)
-    dense_decoded = tf.sparse_tensor_to_dense(d, default_value=-1).eval(session=session)
+    d = sess.run(decoded[0], feed_dict=feed)
+    dense_decoded = tf.sparse_tensor_to_dense(d, default_value=-1).eval(session=sess)
     for i, seq in enumerate(dense_decoded):
 
         seq = [s for s in seq if s != -1]
