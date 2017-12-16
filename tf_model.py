@@ -10,8 +10,8 @@ import numpy as np
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 #PARAMS
 FLAGS = None
-#path = '/home/jacky/2kx/Spyre/__data/TIMIT/*/*/*'
-path = '/home/jacky/2kx/Spyre/pract_data/*'
+path = '/home/jacky/2kx/Spyre/__data/TIMIT/*/*/*'
+#path = '/home/jacky/2kx/Spyre/pract_data/*'
 num_mfccs = 13
 batchsize = 8
 max_timesteps = 150
@@ -19,9 +19,11 @@ timesteplen = 50
 preprocess = 1
 num_hidden = 150
 learning_rate = 1e-2
-momentum = 0.9
-num_layers = 2
+momentum = 2
+num_layers = 4
+prevcost = 0.00
 #0th indice + End indice + space + blank label = 28 characters
+
 num_classes = ord('z') - ord('a') + 4
 
 print(time.strftime('[%H:%M:%S]'), 'Loading network functions... ')
@@ -90,7 +92,7 @@ with graph.as_default():
     loss = tf.nn.ctc_loss(targets, logits, seq_len)
     cost = tf.reduce_mean(loss)
 
-    optimizer = tf.train.MomentumOptimizer(learning_rate,0.9).minimize(cost)
+    optimizer = tf.train.MomentumOptimizer(learning_rate,momentum).minimize(cost)
 
     decoded, log_prob = tf.nn.ctc_greedy_decoder(logits, seq_len)
 
@@ -155,6 +157,11 @@ def pad_sequences(sequences, maxlen=None, dtype=np.float32,
             raise ValueError('Padding type "%s" not understood' % padding)
     return x, lengths
 
+print(time.strftime('[%H:%M:%S]'), 'Parsing directory... ')
+dr = data_util.load_dir(path)
+datasetsize = len(dr[0])
+lr = dr[1]
+
 # Launch the graph
 with tf.Session(graph=graph) as sess:
     tf.global_variables_initializer().run()
@@ -162,10 +169,6 @@ with tf.Session(graph=graph) as sess:
     #Load paths
     print(time.strftime('[%H:%M:%S]'), 'Passing params... ')
     data_util.setParams(batchsize, num_mfccs, num_classes, max_timesteps, timesteplen)
-    print(time.strftime('[%H:%M:%S]'), 'Parsing directory... ')
-    dr = data_util.load_dir(path)
-    datasetsize = len(dr[0])
-    lr = dr[1]
     #Training Loop
     train_cost = train_ler = 0
     start = prev = time.time()
@@ -183,6 +186,9 @@ with tf.Session(graph=graph) as sess:
         train_cost += batch_cost*batchsize
         time_fm = "{:.4f} seconds"
         print(time.strftime('[%H:%M:%S]'),'Batch',i,'trained in',time_fm.format(time.time()-prev))
+        print('>>> Cost:', train_cost)
+        print('>>> Cost Diff:', train_cost-prevcost)
+        prevcost = train_cost
         prev = time.time()
     train_ler += sess.run(ler, feed_dict=feed)*batchsize
     train_cost /= datasetsize
@@ -199,6 +205,6 @@ with tf.Session(graph=graph) as sess:
         seq = [s for s in seq if s != -1]
 
         print('Sequence %d' % i)
-        print('\t Original:\n%s' % train_targets[i])
+        print('\t Original:\n%s' % dr[1][i])
         print('\t Decoded:\n%s' % seq)
         print('Done!')
