@@ -146,8 +146,7 @@ def load_dir(fp):
                             for line in f:
                                 res = ''.join([i for i in line if not i.isdigit()])
                         text.append(res)
-        print(raw_audio)
-        print(time.strftime('[%H:%M:%S]'), 'Succesfully data set of size',len(raw_audio))
+        print(time.strftime('[%H:%M:%S]'), 'Succesfully loaded data set of size',len(raw_audio))
         return raw_audio,phonemes,words,text,ind
 
 def next_Data(path):
