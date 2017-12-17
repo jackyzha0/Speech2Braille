@@ -10,17 +10,17 @@ import numpy as np
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 #PARAMS
 FLAGS = None
-path = '/home/jacky/2kx/Spyre/__data/TIMIT/*/*/*'
-#path = '/home/jacky/2kx/Spyre/pract_data/*'
+#path = '/home/jacky/2kx/Spyre/__data/TIMIT/*/*/*'
+path = '/home/jacky/2kx/Spyre/pract_data/*'
 num_mfccs = 13
 batchsize = 8
 max_timesteps = 150
 timesteplen = 50
 preprocess = 1
-num_hidden = 150
-learning_rate = 1e-2
-momentum = 2
-num_layers = 4
+num_hidden = 300
+learning_rate = 1e-6
+momentum = 0.2
+num_layers = 2
 prevcost = 0.00
 #0th indice + End indice + space + blank label = 28 characters
 
@@ -28,17 +28,10 @@ num_classes = ord('z') - ord('a') + 4
 
 print(time.strftime('[%H:%M:%S]'), 'Loading network functions... ')
 
-#Add sumaries to TensorBoard for weights and biases
-def var_summaries(var):
-    with tf.name_scope('summary'):
-        mean = tf.reduce_mean(var)
-        tf.summary.scalar('mean', mean)
-        with tf.name_scope('stddev'):
-            stddev = tf.sqrt(tf.reduce_mean(tf.square(var - mean)))
-            tf.summary.scalar('stddev', stddev)
-            tf.summary.scalar('max', tf.reduce_max(var))
-            tf.summary.scalar('min', tf.reduce_min(var))
-            tf.summary.histogram('histogram', var)
+# Constants
+SPACE_TOKEN = '<space>'
+SPACE_INDEX = 0
+FIRST_INDEX = ord('a') - 1  # 0 is reserved to space
 
 def preprocess(rawsnd,stdev) :
     """
@@ -54,11 +47,12 @@ with graph.as_default():
     #Network Code is heavily influenced by igormq's ctc_tensorflow example
     # Has size [batch_size, max_stepsize, num_features], but the
     # batch_size and max_stepsize can vary along each step
-    inputs = tf.placeholder(tf.float32, [None, None, num_mfccs+28])
+    inputs = tf.placeholder(tf.float32, [None, None,num_mfccs+28])
 
     # Here we use sparse_placeholder that will generate a
     # SparseTensor required by ctc_loss op.
     targets = tf.sparse_placeholder(tf.int32)
+    #var_summaries(targets)
 
     # 1d array of size [batch_size]
     seq_len = tf.placeholder(tf.int32, [None])
@@ -75,10 +69,12 @@ with graph.as_default():
     # Reshaping to apply the same weights over the timesteps
     outputs = tf.reshape(outputs, [-1, num_hidden])
 
-    W = tf.Variable(tf.truncated_normal([num_hidden,num_classes],stddev=0.1))
+    W = tf.Variable(tf.truncated_normal([num_hidden,num_classes],stddev=0.01))
+    #var_summaries(W)
     # Zero initialization
     # Tip: Is tf.zeros_initializer the same?
     b = tf.Variable(tf.constant(0., shape=[num_classes]))
+    #var_summaries(b)
 
     # Doing the affine projection
     logits = tf.matmul(outputs, W) + b
@@ -91,6 +87,7 @@ with graph.as_default():
 
     loss = tf.nn.ctc_loss(targets, logits, seq_len)
     cost = tf.reduce_mean(loss)
+    #var_summaries(loss)
 
     optimizer = tf.train.MomentumOptimizer(learning_rate,momentum).minimize(cost)
 
@@ -164,6 +161,8 @@ lr = dr[1]
 
 # Launch the graph
 with tf.Session(graph=graph) as sess:
+    print("Starting Tensorboard...")
+    writer = tf.summary.FileWriter("totalsummary", sess.graph)
     tf.global_variables_initializer().run()
 
     #Load paths
@@ -177,19 +176,21 @@ with tf.Session(graph=graph) as sess:
         minibatch = data_util.next_miniBatch(i*batchsize,dr[0])
         minibatch_targets = data_util.next_target_miniBatch(i*batchsize,dr[1])
         indexes = [j % batchsize for j in range(i * batchsize, (i + 1) * batchsize)]
-        batch_train_targets = data_util.sparse_tuple_from(minibatch_targets)
-        batch_train_inputs = minibatch[indexes]
-        batch_train_inputs, batch_train_seq_len = pad_sequences(batch_train_inputs)
-        feed = {inputs: batch_train_inputs, targets: batch_train_targets, seq_len: batch_train_seq_len}
-        #Batch
-        batch_cost, _ = sess.run([cost, optimizer], feed)
-        train_cost += batch_cost*batchsize
-        time_fm = "{:.4f} seconds"
-        print(time.strftime('[%H:%M:%S]'),'Batch',i,'trained in',time_fm.format(time.time()-prev))
-        print('>>> Cost:', train_cost)
-        print('>>> Cost Diff:', train_cost-prevcost)
-        prevcost = train_cost
-        prev = time.time()
+        for j in range(batchsize):
+            batch_train_targets = data_util.sparse_tuple_from(minibatch_targets)
+            batch_train_inputs = minibatch[indexes]
+            batch_train_inputs, batch_train_seq_len = pad_sequences(batch_train_inputs)
+            print(np.array(batch_train_inputs).shape, np.array(batch_train_targets).shape, np.array(batch_train_seq_len).shape)
+            feed = {inputs: batch_train_inputs, targets: batch_train_targets, seq_len: batch_train_seq_len}
+            #Batch
+            batch_cost, _ = sess.run([cost, optimizer], feed)
+            train_cost += batch_cost*batchsize
+            time_fm = "{:.4f} seconds"
+            print(time.strftime('[%H:%M:%S]'),'Batch',i,'trained in',time_fm.format(time.time()-prev))
+            print('>>> Cost:', train_cost)
+            print('>>> Cost Diff:', train_cost-prevcost)
+            prevcost = train_cost
+            prev = time.time()
     train_ler += sess.run(ler, feed_dict=feed)*batchsize
     train_cost /= datasetsize
     train_ler /= datasetsize

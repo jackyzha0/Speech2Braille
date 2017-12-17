@@ -63,7 +63,6 @@ def sparse_tuple_from(sequences, dtype=np.int32):
         A tuple with (indices, values, shape)"""
     indices = []
     values = []
-
     for i, seq in enumerate(sequences):
         indices.extend(zip([i]*len(seq), range(len(seq))))
         values.extend(seq)
@@ -181,6 +180,10 @@ def next_target_miniBatch(index,patharr):
     minibatch = []
     for j in range(0,batchsize):
         tmp = patharr[index+j]
-        minibatch.append(np.array(tmp[0]))
-        print(time.strftime('[%H:%M:%S]'), 'Passed target tensor with rank...',np.array(tmp).shape,j+1,'/',batchsize)
-    return minibatch
+        tmp_k = []
+        for k in range(0,len(tmp)):
+            for l in range(int(tmp[k][1])-int(tmp[k][0])):
+                tmp_k.append(int(tmp[k][2]))
+        minibatch.append(np.array(tmp_k))
+        print(time.strftime('[%H:%M:%S]'), 'Passed target tensor of rank',np.array(tmp_k).ndim,j+1,'/',batchsize)
+    return np.array(minibatch)
