@@ -10,35 +10,20 @@ import numpy as np
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 #PARAMS
 FLAGS = None
-#path = '/home/jacky/2kx/Spyre/__data/TIMIT/*/*/*'
-path = '/home/jacky/2kx/Spyre/pract_data/*'
-num_mfccs = 13
-batchsize = 8
-max_timesteps = 150
-timesteplen = 50
-preprocess = 1
-num_hidden = 300
-learning_rate = 1e-6
-momentum = 0.2
+path = '/home/jacky/2kx/Spyre/__data/TIMIT/*/*/*'
+#path = '/home/jacky/2kx/Spyre/pract_data/*'
+num_mfccs = 4
+batchsize = 32
+num_hidden = 50
+learning_rate = 1e-2
+momentum = 0.9
 num_layers = 2
 prevcost = 0.00
-#0th indice + End indice + space + blank label = 28 characters
+#0th indice + End indice + space + blank label = 27 characters
 
-num_classes = ord('z') - ord('a') + 4
+num_classes = 63
 
 print(time.strftime('[%H:%M:%S]'), 'Loading network functions... ')
-
-# Constants
-SPACE_TOKEN = '<space>'
-SPACE_INDEX = 0
-FIRST_INDEX = ord('a') - 1  # 0 is reserved to space
-
-def preprocess(rawsnd,stdev) :
-    """
-    If preprocess == 1, add additional white noise with stdev (default 0.6)
-    """
-
-
 graph = tf.Graph()
 with graph.as_default():
     def lstm_cell():
@@ -47,7 +32,7 @@ with graph.as_default():
     #Network Code is heavily influenced by igormq's ctc_tensorflow example
     # Has size [batch_size, max_stepsize, num_features], but the
     # batch_size and max_stepsize can vary along each step
-    inputs = tf.placeholder(tf.float32, [None, None,num_mfccs+28])
+    inputs = tf.placeholder(tf.float32, [batchsize, None,num_mfccs+28])
 
     # Here we use sparse_placeholder that will generate a
     # SparseTensor required by ctc_loss op.
@@ -72,7 +57,6 @@ with graph.as_default():
     W = tf.Variable(tf.truncated_normal([num_hidden,num_classes],stddev=0.01))
     #var_summaries(W)
     # Zero initialization
-    # Tip: Is tf.zeros_initializer the same?
     b = tf.Variable(tf.constant(0., shape=[num_classes]))
     #var_summaries(b)
 
@@ -85,7 +69,7 @@ with graph.as_default():
     # Time major
     logits = tf.transpose(logits, (1, 0, 2))
 
-    loss = tf.nn.ctc_loss(targets, logits, seq_len)
+    loss = tf.nn.ctc_loss(targets, logits, seq_len,ignore_longer_outputs_than_inputs=True)
     cost = tf.reduce_mean(loss)
     #var_summaries(loss)
 
@@ -167,45 +151,43 @@ with tf.Session(graph=graph) as sess:
 
     #Load paths
     print(time.strftime('[%H:%M:%S]'), 'Passing params... ')
-    data_util.setParams(batchsize, num_mfccs, num_classes, max_timesteps, timesteplen)
+    data_util.setParams(batchsize, num_mfccs, num_classes)
     #Training Loop
     train_cost = train_ler = 0
     start = prev = time.time()
     for i in range(0,datasetsize/batchsize):
-        print(time.strftime('[%H:%M:%S]'),'Training batch',i)
+        #print(datasetsize,batchsize)
         minibatch = data_util.next_miniBatch(i*batchsize,dr[0])
         minibatch_targets = data_util.next_target_miniBatch(i*batchsize,dr[1])
         indexes = [j % batchsize for j in range(i * batchsize, (i + 1) * batchsize)]
-        for j in range(batchsize):
-            batch_train_targets = data_util.sparse_tuple_from(minibatch_targets)
-            batch_train_inputs = minibatch[indexes]
-            batch_train_inputs, batch_train_seq_len = pad_sequences(batch_train_inputs)
-            print(np.array(batch_train_inputs).shape, np.array(batch_train_targets).shape, np.array(batch_train_seq_len).shape)
-            feed = {inputs: batch_train_inputs, targets: batch_train_targets, seq_len: batch_train_seq_len}
-            #Batch
-            batch_cost, _ = sess.run([cost, optimizer], feed)
-            train_cost += batch_cost*batchsize
-            time_fm = "{:.4f} seconds"
-            print(time.strftime('[%H:%M:%S]'),'Batch',i,'trained in',time_fm.format(time.time()-prev))
-            print('>>> Cost:', train_cost)
-            print('>>> Cost Diff:', train_cost-prevcost)
-            prevcost = train_cost
-            prev = time.time()
-    train_ler += sess.run(ler, feed_dict=feed)*batchsize
+        batch_train_targets = data_util.sparse_tuple_from(minibatch_targets)
+        batch_train_inputs = minibatch[indexes]
+        batch_train_inputs, batch_train_seq_len = pad_sequences(batch_train_inputs)
+        print(batch_train_seq_len)
+        print(time.strftime('[%H:%M:%S]'),'Updating Weights of batch',i)
+        feed = {inputs: batch_train_inputs, targets: batch_train_targets, seq_len: batch_train_seq_len}
+        #Batch
+        batch_cost, _ = sess.run([cost, optimizer], feed)
+        train_cost += batch_cost*batchsize
+        train_ler += sess.run(ler, feed_dict=feed)*batchsize
+        time_fm = "{:.4f} seconds"
+
+        d = sess.run(decoded[0], feed_dict=feed)
+        dense_decoded = tf.sparse_tensor_to_dense(d, default_value=-1).eval(session=sess)
+        for i, seq in enumerate(dense_decoded):
+
+            seq = [s for s in seq if s != -1]
+            print('Sequence %d' % i)
+            print('\t Original:\n%s' % minibatch_targets[i])
+            print('\t Decoded:\n%s' % seq)
+        print(time.strftime('[%H:%M:%S]'),'Batch',i,'trained in',time_fm.format(time.time()-prev))
+        print('>>> Cost:', batch_cost)
+        print('>>> Cost Diff:', batch_cost-prevcost)
+        prevcost = batch_cost
+        prev = time.time()
+
+
     train_cost /= datasetsize
     train_ler /= datasetsize
     log = "Cost: {:.3f}, Label Error Rate: {:.3f}, Time taken: {:.3f}"
     print(time.strftime('[%H:%M:%S]'),log.format(train_cost, train_ler, time.time() - start))
-
-    #Decoding
-    feed = {inputs: batch_train_inputs, targets: batch_train_targets, seq_len: batch_train_seq_len}
-    d = sess.run(decoded[0], feed_dict=feed)
-    dense_decoded = tf.sparse_tensor_to_dense(d, default_value=-1).eval(session=sess)
-    for i, seq in enumerate(dense_decoded):
-
-        seq = [s for s in seq if s != -1]
-
-        print('Sequence %d' % i)
-        print('\t Original:\n%s' % dr[1][i])
-        print('\t Decoded:\n%s' % seq)
-        print('Done!')
