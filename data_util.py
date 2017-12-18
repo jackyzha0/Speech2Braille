@@ -20,8 +20,6 @@ sample_rate = 16000
 batchsize = -1
 num_mfccs = -1
 num_classes = -1
-max_timestepsize = -1
-max_timesteplen = -1
 path_phonetable = '/home/jacky/2kx/Spyre/git/phon_table.txt'
 
 print(time.strftime('[%H:%M:%S]'), 'Constructing Phone Conversion Table...')
@@ -31,11 +29,12 @@ with open(path_phonetable) as f:
         tmp_phn = line.split("\n")[0]
         phn_lookup.append(tmp_phn)
     print(phn_lookup)
+    print(len(phn_lookup))
 print(time.strftime('[%H:%M:%S]'),'Loaded phone table')
 
 print(time.strftime('[%H:%M:%S]'), 'Loading helper functions...')
 
-def setParams(_batchsize, _num_mfccs, _num_classes, _max_timesteps, _timesteplen):
+def setParams(_batchsize, _num_mfccs, _num_classes):
     """Set Training Parameters
     Args:+28
         _batchsize: size of mini batches
@@ -47,13 +46,9 @@ def setParams(_batchsize, _num_mfccs, _num_classes, _max_timesteps, _timesteplen
     global batchsize
     global num_mfccs
     global num_classes
-    global max_timestepsize
-    global max_timesteplen
     batchsize = _batchsize
     num_mfccs = _num_mfccs
     num_classes = _num_classes
-    max_timestepsize = _max_timesteps
-    max_timesteplen = _timesteplen
 
 def sparse_tuple_from(sequences, dtype=np.int32):
     """Create a sparse representention of x. For handling one-hot vector
@@ -87,7 +82,7 @@ def features(rawsnd, num) :
         *Zero Crossing Rate
         *Spectral Rolloff
         *Spectral Centroid"""
-    x, _ = librosa.load(rawsnd,sr=sample_rate, duration=max_timesteplen*max_timestepsize)
+    x, _ = librosa.load(rawsnd)
     s_tft = np.abs(librosa.stft(x))
     ft = lib_feat.mfcc(y=x, sr=sample_rate, n_mfcc=num)
     ft = np.append(ft,lib_feat.chroma_stft(S=s_tft, sr=sample_rate),axis=0)
@@ -96,8 +91,8 @@ def features(rawsnd, num) :
     ft = np.append(ft,lib_feat.zero_crossing_rate(y=x),axis=0)
     ft = np.append(ft,lib_feat.spectral_rolloff(y=x,sr=sample_rate),axis=0)
     ft = np.append(ft,lib_feat.spectral_centroid(y=x,sr=sample_rate),axis=0)
-    z = np.zeros((num+12+7+6+3,(max_timestepsize*((sample_rate/1000)*2))-ft.shape[1]))
-    ft = np.concatenate((ft,z),axis=1)
+    ft = np.swapaxes(ft,0,1)
+    print(ft.shape)
     return (ft)
 
 def phn_to_int(inp):
@@ -173,8 +168,8 @@ def next_miniBatch(index,patharr):
         minibatch.append(np.array(tmp[0]))
         print(time.strftime('[%H:%M:%S]'), 'Passed input tensor with rank...',np.array(tmp[0]).shape,j+1,'/',batchsize)
     minibatch = np.array(minibatch)
-    minibatch = np.swapaxes(minibatch,2,1)
-    print(time.strftime('[%H:%M:%S]'), 'Succesfully loaded minibatch of rank',minibatch.ndim)
+    #minibatch = np.swapaxes(minibatch,2,1)
+    print(time.strftime('[%H:%M:%S]'), 'Succesfully loaded minibatch of rank',minibatch.shape)
     return minibatch
 def next_target_miniBatch(index,patharr):
     minibatch = []
@@ -182,8 +177,7 @@ def next_target_miniBatch(index,patharr):
         tmp = patharr[index+j]
         tmp_k = []
         for k in range(0,len(tmp)):
-            for l in range(int(tmp[k][1])-int(tmp[k][0])):
-                tmp_k.append(int(tmp[k][2]))
+            tmp_k.append(int(tmp[k][2]))
         minibatch.append(np.array(tmp_k))
         print(time.strftime('[%H:%M:%S]'), 'Passed target tensor of rank',np.array(tmp_k).ndim,j+1,'/',batchsize)
-    return np.array(minibatch)
+    return np.asarray(minibatch)
