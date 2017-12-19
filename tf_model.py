@@ -10,10 +10,11 @@ import numpy as np
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 #PARAMS
 FLAGS = None
-path = '/home/jacky/2kx/Spyre/__data/TIMIT/*/*/*'
-#path = '/home/jacky/2kx/Spyre/pract_data/*'
+#path = '/home/jacky/2kx/Spyre/__data/TIMIT/*/*/*'
+path = '/home/jacky/2kx/Spyre/pract_data/*'
+logs_path = '/home/jacky/2kx/Spyre/git/totalsummary'
 num_mfccs = 13
-batchsize = 32
+batchsize = 4
 num_hidden = 50
 learning_rate = 1e-3
 momentum = 0.9
@@ -30,55 +31,57 @@ with graph.as_default():
       return tf.contrib.rnn.BasicLSTMCell(num_hidden)
 
     #Network Code is heavily influenced by igormq's ctc_tensorflow example
-    # Has size [batch_size, max_stepsize, num_features], but the
-    # batch_size and max_stepsize can vary along each step
-    inputs = tf.placeholder(tf.float32, [batchsize, None,num_mfccs+28])
+    with tf.name_scope('input'):
+        inputs = tf.placeholder(tf.float32, [batchsize, None,num_mfccs+28])
+        targets = tf.sparse_placeholder(tf.int32)
 
-    # Here we use sparse_placeholder that will generate a
-    # SparseTensor required by ctc_loss op.
-    targets = tf.sparse_placeholder(tf.int32)
-    #var_summaries(targets)
-
-    # 1d array of size [batch_size]
-    seq_len = tf.placeholder(tf.int32, [None])
+    with tf.name_scope('inputLength'):
+        seq_len = tf.placeholder(tf.int32, [None])
 
     # Stacking rnn cells
-    stack = tf.contrib.rnn.MultiRNNCell([lstm_cell() for _ in range(num_layers)])
+    with tf.name_scope('cellStack'):
+        stack = tf.contrib.rnn.MultiRNNCell([lstm_cell() for _ in range(num_layers)])
 
     # The second output is the last state and we will not use that
     outputs, _ = tf.nn.dynamic_rnn(stack, inputs, seq_len, dtype=tf.float32)
-
     shape = tf.shape(inputs)
     batch_s, TF_max_timesteps = shape[0], shape[1]
 
     # Reshaping to apply the same weights over the timesteps
-    outputs = tf.reshape(outputs, [-1, num_hidden])
+    with tf.name_scope('outputs'):
+        outputs = tf.reshape(outputs, [-1, num_hidden])
 
-    #W = tf.Variable(tf.truncated_normal([num_hidden,num_classes],stddev=0.1))
-    initializer = tf.contrib.layers.xavier_initializer()
-    W = tf.Variable(initializer([num_hidden,num_classes]))
-    #var_summaries(W)
+    with tf.name_scope('weights'):
+        initializer = tf.contrib.layers.xavier_initializer()
+        W = tf.Variable(initializer([num_hidden,num_classes]))
+        #W = tf.Variable(tf.truncated_normal([num_hidden,num_classes],stddev=0.1))
     # Zero initialization
-    b = tf.Variable(tf.constant(0., shape=[num_classes]))
-    #var_summaries(b)
+    with tf.name_scope('biases'):
+        b = tf.Variable(tf.constant(0., shape=[num_classes]))
 
-    # Doing the affine projection
-    logits = tf.matmul(outputs, W) + b
-
-    # Reshaping back to the original shape
-    logits = tf.reshape(logits, [batch_s, -1, num_classes])
-
-    # Time major
-    logits = tf.transpose(logits, (1, 0, 2))
-
-    loss = tf.nn.ctc_loss(targets, logits, seq_len,ignore_longer_outputs_than_inputs=True)
-    cost = tf.reduce_mean(loss)
+    with tf.name_scope('outputTransform'):
+        # Doing the affine projection
+        logits = tf.matmul(outputs, W) + b
+        # Reshaping back to the original shape
+        logits = tf.reshape(logits, [batch_s, -1, num_classes])
+        # Time major
+        logits = tf.transpose(logits, (1, 0, 2))
+    with tf.name_scope('loss'):
+        loss = tf.nn.ctc_loss(targets, logits, seq_len,ignore_longer_outputs_than_inputs=True)
+    with tf.name_scope('cost'):
+        cost = tf.reduce_mean(loss)
+    tf.summary.scalar("cost", cost)
     #var_summaries(loss)
+    with tf.name_scope('optimizer'):
+        optimizer = tf.train.MomentumOptimizer(learning_rate,momentum).minimize(cost)
 
-    optimizer = tf.train.MomentumOptimizer(learning_rate,momentum).minimize(cost)
+    with tf.name_scope('decoder'):
+        decoded, log_prob = tf.nn.ctc_greedy_decoder(logits, seq_len)
+    with tf.name_scope('LER'):
+        ler = tf.reduce_mean(tf.edit_distance(tf.cast(decoded[0], tf.int32),targets))
+    tf.summary.scalar("LER", cost)
 
-    decoded, log_prob = tf.nn.ctc_greedy_decoder(logits, seq_len)
-    ler = tf.reduce_mean(tf.edit_distance(tf.cast(decoded[0], tf.int32),targets))
+    merged = tf.summary.merge_all()
 
 def pad_sequences(sequences, maxlen=None, dtype=np.float32,
                   padding='post', truncating='post', value=0.):
@@ -147,7 +150,7 @@ lr = dr[1]
 # Launch the graph
 with tf.Session(graph=graph) as sess:
     print("Starting Tensorboard...")
-    writer = tf.summary.FileWriter("totalsummary", sess.graph)
+    writer = tf.summary.FileWriter(logs_path, graph=sess.graph)
     tf.global_variables_initializer().run()
 
     #Load paths
@@ -156,6 +159,7 @@ with tf.Session(graph=graph) as sess:
     #Training Loop
     train_cost = train_ler = 0
     start = prev = time.time()
+
     for i in range(0,datasetsize/batchsize):
         #print(datasetsize,batchsize)
         minibatch = data_util.next_miniBatch(i*batchsize,dr[0])
@@ -186,6 +190,10 @@ with tf.Session(graph=graph) as sess:
         print('>>> Cost Diff:', batch_cost-prevcost)
         prevcost = batch_cost
         prev = time.time()
+        # write log
+        summary = sess.run(merged, feed_dict=feed)
+        writer.add_summary(summary, i)
+        writer.flush()
 
 
     train_cost /= datasetsize
