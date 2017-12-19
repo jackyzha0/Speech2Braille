@@ -12,13 +12,13 @@ os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 FLAGS = None
 path = '/home/jacky/2kx/Spyre/__data/TIMIT/*/*/*'
 #path = '/home/jacky/2kx/Spyre/pract_data/*'
-num_mfccs = 4
+num_mfccs = 13
 batchsize = 32
 num_hidden = 50
-learning_rate = 1e-2
+learning_rate = 1e-3
 momentum = 0.9
 num_layers = 2
-prevcost = 0.00
+prevcost = 0
 #0th indice + End indice + space + blank label = 27 characters
 
 num_classes = 63
@@ -54,7 +54,9 @@ with graph.as_default():
     # Reshaping to apply the same weights over the timesteps
     outputs = tf.reshape(outputs, [-1, num_hidden])
 
-    W = tf.Variable(tf.truncated_normal([num_hidden,num_classes],stddev=0.01))
+    #W = tf.Variable(tf.truncated_normal([num_hidden,num_classes],stddev=0.1))
+    initializer = tf.contrib.layers.xavier_initializer()
+    W = tf.Variable(initializer([num_hidden,num_classes]))
     #var_summaries(W)
     # Zero initialization
     b = tf.Variable(tf.constant(0., shape=[num_classes]))
@@ -76,7 +78,6 @@ with graph.as_default():
     optimizer = tf.train.MomentumOptimizer(learning_rate,momentum).minimize(cost)
 
     decoded, log_prob = tf.nn.ctc_greedy_decoder(logits, seq_len)
-
     ler = tf.reduce_mean(tf.edit_distance(tf.cast(decoded[0], tf.int32),targets))
 
 def pad_sequences(sequences, maxlen=None, dtype=np.float32,
@@ -163,7 +164,6 @@ with tf.Session(graph=graph) as sess:
         batch_train_targets = data_util.sparse_tuple_from(minibatch_targets)
         batch_train_inputs = minibatch[indexes]
         batch_train_inputs, batch_train_seq_len = pad_sequences(batch_train_inputs)
-        print(batch_train_seq_len)
         print(time.strftime('[%H:%M:%S]'),'Updating Weights of batch',i)
         feed = {inputs: batch_train_inputs, targets: batch_train_targets, seq_len: batch_train_seq_len}
         #Batch
@@ -174,12 +174,13 @@ with tf.Session(graph=graph) as sess:
 
         d = sess.run(decoded[0], feed_dict=feed)
         dense_decoded = tf.sparse_tensor_to_dense(d, default_value=-1).eval(session=sess)
-        for i, seq in enumerate(dense_decoded):
+        for k, seq in enumerate(dense_decoded):
 
             seq = [s for s in seq if s != -1]
-            print('Sequence %d' % i)
-            print('\t Original:\n%s' % minibatch_targets[i])
+            print('Sequence %d' % k)
+            print('\t Original:\n%s' % minibatch_targets[k])
             print('\t Decoded:\n%s' % seq)
+        print(dense_decoded)
         print(time.strftime('[%H:%M:%S]'),'Batch',i,'trained in',time_fm.format(time.time()-prev))
         print('>>> Cost:', batch_cost)
         print('>>> Cost Diff:', batch_cost-prevcost)
