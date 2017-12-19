@@ -15,8 +15,6 @@ print('[OK] tensorflow ')
 import glob
 print('[OK] glob ')
 
-
-sample_rate = 16000
 batchsize = -1
 num_mfccs = -1
 num_classes = -1
@@ -82,7 +80,7 @@ def features(rawsnd, num) :
         *Zero Crossing Rate
         *Spectral Rolloff
         *Spectral Centroid"""
-    x, _ = librosa.load(rawsnd)
+    x, sample_rate = librosa.load(rawsnd)
     s_tft = np.abs(librosa.stft(x))
     ft = lib_feat.mfcc(y=x, sr=sample_rate, n_mfcc=num)
     ft = np.append(ft,lib_feat.chroma_stft(S=s_tft, sr=sample_rate),axis=0)
@@ -92,7 +90,6 @@ def features(rawsnd, num) :
     ft = np.append(ft,lib_feat.spectral_rolloff(y=x,sr=sample_rate),axis=0)
     ft = np.append(ft,lib_feat.spectral_centroid(y=x,sr=sample_rate),axis=0)
     ft = np.swapaxes(ft,0,1)
-    print(ft.shape)
     return (ft)
 
 def phn_to_int(inp):
@@ -124,7 +121,7 @@ def load_dir(fp):
                             tmp_phn_file = []
                             for line in f:
                                 tmp_phn = line.split(" ")
-                                tmp_phn[2] = phn_to_int(tmp_phn[2][:-1])
+                                tmp_phn = phn_to_int(tmp_phn[2][:-1])
                                 tmp_phn_file.append(tmp_phn)
                         print(time.strftime('[%H:%M:%S]'),'Phone file',__file[35:],'loaded, size',len(tmp_phn_file))
                         phonemes.append(tmp_phn_file)
@@ -177,7 +174,7 @@ def next_target_miniBatch(index,patharr):
         tmp = patharr[index+j]
         tmp_k = []
         for k in range(0,len(tmp)):
-            tmp_k.append(int(tmp[k][2]))
+            tmp_k.append(int(tmp[k]))
         minibatch.append(np.array(tmp_k))
         print(time.strftime('[%H:%M:%S]'), 'Passed target tensor of rank',np.array(tmp_k).ndim,j+1,'/',batchsize)
     return np.asarray(minibatch)
