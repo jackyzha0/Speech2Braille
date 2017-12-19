@@ -19,6 +19,7 @@ batchsize = -1
 num_mfccs = -1
 num_classes = -1
 path_phonetable = '/home/jacky/2kx/Spyre/git/phon_table.txt'
+path_replacekey = '/home/jacky/2kx/Spyre/git/replace_key.txt'
 
 print(time.strftime('[%H:%M:%S]'), 'Constructing Phone Conversion Table...')
 with open(path_phonetable) as f:
@@ -94,6 +95,10 @@ def features(rawsnd, num) :
 
 def phn_to_int(inp):
     return phn_lookup.index(inp)
+
+def check_phone_conversion(inp):
+    print('wip')
+
 
 def load_dir(fp):
     """Load raw paths data into arrays
