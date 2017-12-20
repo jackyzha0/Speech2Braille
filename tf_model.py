@@ -11,18 +11,18 @@ os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 #PARAMS
 FLAGS = None
 #path = '/home/jacky/2kx/Spyre/__data/TIMIT/*/*/*'
-path = '/home/jacky/2kx/Spyre/pract_data/*'
+#path = '/home/jacky/2kx/Spyre/pract_data/*'
+path = '/home/jacky/2kx/Spyre/larger_pract/*/*'
 logs_path = '/home/jacky/2kx/Spyre/git/totalsummary'
 num_mfccs = 13
-batchsize = 4
-num_hidden = 50
+batchsize = 1
+num_hidden = 300
 learning_rate = 1e-3
 momentum = 0.9
 num_layers = 2
 prevcost = 0
 #0th indice + End indice + space + blank label = 27 characters
-
-num_classes = 63
+num_classes = 62
 
 print(time.strftime('[%H:%M:%S]'), 'Loading network functions... ')
 graph = tf.Graph()
@@ -53,11 +53,13 @@ with graph.as_default():
 
     with tf.name_scope('weights'):
         initializer = tf.contrib.layers.xavier_initializer()
-        W = tf.Variable(initializer([num_hidden,num_classes]))
-        #W = tf.Variable(tf.truncated_normal([num_hidden,num_classes],stddev=0.1))
+        #W = tf.Variable(initializer([num_hidden,num_classes]))
+        W = tf.Variable(tf.random_normal([num_hidden, num_classes]))
+        tf.summary.histogram('weightsHistogram', W)
     # Zero initialization
     with tf.name_scope('biases'):
         b = tf.Variable(tf.constant(0., shape=[num_classes]))
+        tf.summary.histogram('biasesHistogram', b)
 
     with tf.name_scope('outputTransform'):
         # Doing the affine projection
@@ -67,7 +69,7 @@ with graph.as_default():
         # Time major
         logits = tf.transpose(logits, (1, 0, 2))
     with tf.name_scope('loss'):
-        loss = tf.nn.ctc_loss(targets, logits, seq_len,ignore_longer_outputs_than_inputs=True)
+        loss = tf.reduce_sum(tf.nn.ctc_loss(targets, logits, seq_len,ignore_longer_outputs_than_inputs=True))
     with tf.name_scope('cost'):
         cost = tf.reduce_mean(loss)
     tf.summary.scalar("cost", cost)
@@ -78,7 +80,7 @@ with graph.as_default():
     with tf.name_scope('decoder'):
         decoded, log_prob = tf.nn.ctc_greedy_decoder(logits, seq_len)
     with tf.name_scope('LER'):
-        ler = tf.reduce_mean(tf.edit_distance(tf.cast(decoded[0], tf.int32),targets))
+        ler = tf.reduce_sum(tf.edit_distance(tf.cast(decoded[0], tf.int32),targets))
     tf.summary.scalar("LER", cost)
 
     merged = tf.summary.merge_all()
@@ -152,6 +154,8 @@ with tf.Session(graph=graph) as sess:
     print("Starting Tensorboard...")
     writer = tf.summary.FileWriter(logs_path, graph=sess.graph)
     tf.global_variables_initializer().run()
+    run_options = tf.RunOptions(trace_level=tf.RunOptions.FULL_TRACE)
+    run_metadata = tf.RunMetadata()
 
     #Load paths
     print(time.strftime('[%H:%M:%S]'), 'Passing params... ')
@@ -166,7 +170,7 @@ with tf.Session(graph=graph) as sess:
         minibatch_targets = data_util.next_target_miniBatch(i*batchsize,dr[1])
         indexes = [j % batchsize for j in range(i * batchsize, (i + 1) * batchsize)]
         batch_train_targets = data_util.sparse_tuple_from(minibatch_targets)
-        batch_train_inputs = minibatch[indexes]
+        batch_train_inputs = minibatch
         batch_train_inputs, batch_train_seq_len = pad_sequences(batch_train_inputs)
         print(time.strftime('[%H:%M:%S]'),'Updating Weights of batch',i)
         feed = {inputs: batch_train_inputs, targets: batch_train_targets, seq_len: batch_train_seq_len}
@@ -188,11 +192,14 @@ with tf.Session(graph=graph) as sess:
         print(time.strftime('[%H:%M:%S]'),'Batch',i,'trained in',time_fm.format(time.time()-prev))
         print('>>> Cost:', batch_cost)
         print('>>> Cost Diff:', batch_cost-prevcost)
+        print('>>>',(i+1)*batchsize,'/',datasetsize,'  Estimated Training Time:',time_fm.format((datasetsize-((i+1)*batchsize))*((time.time()-prev)/4)))
         prevcost = batch_cost
         prev = time.time()
         # write log
-        summary = sess.run(merged, feed_dict=feed)
+
+        summary = sess.run(merged, feed_dict=feed, options=run_options, run_metadata=run_metadata)
         writer.add_summary(summary, i)
+        writer.add_run_metadata(run_metadata, 'step%03d' % i)
         writer.flush()
 
 
