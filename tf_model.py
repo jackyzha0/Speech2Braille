@@ -22,7 +22,7 @@ momentum = 0.9
 num_layers = 2
 prevcost = 0
 #0th indice + End indice + space + blank label = 27 characters
-num_classes = 62
+num_classes = 63
 
 print(time.strftime('[%H:%M:%S]'), 'Loading network functions... ')
 graph = tf.Graph()

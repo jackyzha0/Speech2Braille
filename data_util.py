@@ -20,18 +20,31 @@ num_mfccs = -1
 num_classes = -1
 path_phonetable = '/home/jacky/2kx/Spyre/git/phon_table.txt'
 path_replacekey = '/home/jacky/2kx/Spyre/git/replace_key.txt'
+phn_lookup = []
+replacekey = {}
 
 print(time.strftime('[%H:%M:%S]'), 'Constructing Phone Conversion Table...')
 with open(path_phonetable) as f:
-    phn_lookup = []
     for line in f:
         tmp_phn = line.split("\n")[0]
         phn_lookup.append(tmp_phn)
     print(phn_lookup)
-    print(len(phn_lookup))
 print(time.strftime('[%H:%M:%S]'),'Loaded phone table')
+with open(path_replacekey) as f:
+    key = []
+    element = []
+    for line in f:
+        key.append(line.split(" ")[0])
+        element.append((line.split(" ")[1:][0]).strip())
+    print(key,element)
+    replacekey = dict(zip(key,element))
+    print(replacekey)
+print(time.strftime('[%H:%M:%S]'),'Loaded phomeme replacement key')
 
 print(time.strftime('[%H:%M:%S]'), 'Loading helper functions...')
+
+def getClass():
+    return len(phn_lookup)-len(replacekey.keys())
 
 def setParams(_batchsize, _num_mfccs, _num_classes):
     """Set Training Parameters
@@ -94,11 +107,16 @@ def features(rawsnd, num) :
     return (ft)
 
 def phn_to_int(inp):
-    return phn_lookup.index(inp)
+    if inp=='-':
+        return 0
+    else:
+        return phn_lookup.index(inp)+1
 
 def check_phone_conversion(inp):
-    print('wip')
-
+    if inp in replacekey.keys():
+        return replacekey[inp]
+    else:
+        return inp
 
 def load_dir(fp):
     """Load raw paths data into arrays
@@ -126,8 +144,9 @@ def load_dir(fp):
                             tmp_phn_file = []
                             for line in f:
                                 tmp_phn = line.split(" ")
-                                tmp_phn = phn_to_int(tmp_phn[2][:-1])
-                                tmp_phn_file.append(tmp_phn)
+                                tmp_phn = phn_to_int(check_phone_conversion(tmp_phn[2][:-1]))
+                                if tmp_phn != 0:
+                                    tmp_phn_file.append(tmp_phn)
                         print(time.strftime('[%H:%M:%S]'),'Phone file',__file[35:],'loaded, size',len(tmp_phn_file))
                         phonemes.append(tmp_phn_file)
                     if (".WRD" in __file):
