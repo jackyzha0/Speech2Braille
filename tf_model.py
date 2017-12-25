@@ -1,6 +1,7 @@
 # !/usr/local/bin/python
 from __future__ import print_function
 import time
+import datetime
 print(time.strftime('[%H:%M:%S]'), 'Starting network... ')
 import tensorflow as tf
 import os
@@ -10,14 +11,14 @@ import numpy as np
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 #PARAMS
 FLAGS = None
-#path = '/home/jacky/2kx/Spyre/__data/TIMIT/*/*/*'
+path = '/home/jacky/2kx/Spyre/__data/TIMIT/*/*/*'
 #path = '/home/jacky/2kx/Spyre/pract_data/*'
-path = '/home/jacky/2kx/Spyre/larger_pract/*/*'
-logs_path = '/home/jacky/2kx/Spyre/git/totalsummary'
+#path = '/home/jacky/2kx/Spyre/larger_pract/*/*'
+logs_path = '/home/jacky/2kx/Spyre/git/totalsummary/logs/'+datetime.datetime.fromtimestamp(time.time()).strftime('%H:%M:%S')
 num_mfccs = 13
 batchsize = 1
-num_hidden = 300
-learning_rate = 1e-3
+num_hidden = 100
+learning_rate = 5e-3
 momentum = 0.9
 num_layers = 2
 prevcost = 0
@@ -32,8 +33,10 @@ with graph.as_default():
 
     #Network Code is heavily influenced by igormq's ctc_tensorflow example
     with tf.name_scope('input'):
-        inputs = tf.placeholder(tf.float32, [batchsize, None,num_mfccs+28])
+        inputs = tf.placeholder(tf.float32, [batchsize, None, num_mfccs+28])
         targets = tf.sparse_placeholder(tf.int32)
+        tf.summary.histogram("input",inputs)
+        tf.summary.histogram("targets",tf.sparse_to_dense(targets.indices,targets.dense_shape,targets.values))
 
     with tf.name_scope('inputLength'):
         seq_len = tf.placeholder(tf.int32, [None])
@@ -52,9 +55,9 @@ with graph.as_default():
         outputs = tf.reshape(outputs, [-1, num_hidden])
 
     with tf.name_scope('weights'):
-        initializer = tf.contrib.layers.xavier_initializer()
-        #W = tf.Variable(initializer([num_hidden,num_classes]))
-        W = tf.Variable(tf.random_normal([num_hidden, num_classes]))
+        #initializer = tf.contrib.layers.xavier_initializer()
+        W = tf.Variable(tf.truncated_normal([num_hidden,num_classes],stddev=0.01))
+        #W = tf.Variable(tf.random_normal([num_hidden, num_classes]))
         tf.summary.histogram('weightsHistogram', W)
     # Zero initialization
     with tf.name_scope('biases'):
@@ -69,18 +72,21 @@ with graph.as_default():
         # Time major
         logits = tf.transpose(logits, (1, 0, 2))
     with tf.name_scope('loss'):
-        loss = tf.reduce_sum(tf.nn.ctc_loss(targets, logits, seq_len,ignore_longer_outputs_than_inputs=True))
+        loss = tf.reduce_sum(tf.nn.ctc_loss(targets, logits, seq_len, ignore_longer_outputs_than_inputs=True))
     with tf.name_scope('cost'):
         cost = tf.reduce_mean(loss)
     tf.summary.scalar("cost", cost)
     #var_summaries(loss)
     with tf.name_scope('optimizer'):
-        optimizer = tf.train.MomentumOptimizer(learning_rate,momentum).minimize(cost)
+        #optimizer = tf.train.MomentumOptimizer(learning_rate,momentum).minimize(cost)
+        optimizer = tf.train.AdamOptimizer().minimize(cost)
 
     with tf.name_scope('decoder'):
         decoded, log_prob = tf.nn.ctc_greedy_decoder(logits, seq_len)
+        tf.summary.histogram("outputs",tf.sparse_to_dense(decoded[0].indices,decoded[0].dense_shape,decoded[0].values))
+        tf.summary.histogram("log_prob",log_prob)
     with tf.name_scope('LER'):
-        ler = tf.reduce_sum(tf.edit_distance(tf.cast(decoded[0], tf.int32),targets))
+        ler = tf.reduce_mean(tf.edit_distance(tf.cast(decoded[0], tf.int32),targets))
     tf.summary.scalar("LER", cost)
 
     merged = tf.summary.merge_all()
@@ -196,12 +202,10 @@ with tf.Session(graph=graph) as sess:
         prevcost = batch_cost
         prev = time.time()
         # write log
-
         summary = sess.run(merged, feed_dict=feed, options=run_options, run_metadata=run_metadata)
         writer.add_summary(summary, i)
         writer.add_run_metadata(run_metadata, 'step%03d' % i)
         writer.flush()
-
 
     train_cost /= datasetsize
     train_ler /= datasetsize
