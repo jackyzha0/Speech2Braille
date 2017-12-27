@@ -70,13 +70,13 @@ def r_saveImg(arr):
     n=0
     for i in arr:
         im = scipy.misc.toimage(i)
-        im.save('/home/jacky/2kx/Spyre/git/r_img/'+str(n)+'.jpg')
+        im.save('/home/jacky/2kx/Spyre/nsound_git/r_img/'+str(n)+'.jpg')
         n+=1
 def saveImg(arr):
     n=0
     for i in arr:
         im = scipy.misc.toimage(i)
-        im.save('/home/jacky/2kx/Spyre/git/img/'+str(n)+'.jpg')
+        im.save('/home/jacky/2kx/Spyre/nsound_git/img/'+str(n)+'.jpg')
         n+=1
 
 def features(rawsnd, num) :
@@ -155,21 +155,24 @@ def next_miniBatch(index,patharr):
     """
     minibatch = []
     for j in index:
+        #tmp = next_Data(patharr[j])
         tmp = next_Data(patharr[j])
         minibatch.append(np.array(tmp[0]))
         #print(time.strftime('[%H:%M:%S]'), 'Passed input tensor',batchsize)
+        #print(time.strftime('[%H:%M:%S]'), 'Passed input tensor',np.asarray(np.array(tmp[0])).shape)
     minibatch = np.array(minibatch)
-    saveImg(minibatch)
+    #saveImg(minibatch)
     return np.asarray(minibatch)
 def next_target_miniBatch(index,patharr):
     minibatch = []
     for j in index:
+        #tmp = patharr[j]
         tmp = patharr[j]
         tmp_k = []
         for k in range(0,len(tmp)):
             tmp_k.append(int(tmp[k]))
         minibatch.append(np.array(tmp_k))
-        #print(time.strftime('[%H:%M:%S]'), 'Passed target tensor',batchsize)
+        #print(time.strftime('[%H:%M:%S]'), 'Passed target tensor',np.asarray(tmp_k).shape)
     return np.asarray(minibatch)
 
 def pad_sequences(sequences, maxlen=None, dtype=np.float32,
