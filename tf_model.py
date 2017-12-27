@@ -13,40 +13,46 @@ from PIL import Image
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 #PARAMS
 FLAGS = None
+SPACE_TOKEN = '<space>'
+SPACE_INDEX = 0
+FIRST_INDEX = ord('a') - 1  # 0 is reserved to space
 test_path = '/home/jacky/2kx/Spyre/__data/TIMIT/TEST/*/*'
 path = '/home/jacky/2kx/Spyre/__data/TIMIT/TRAIN/*/*'
 #path = '/home/jacky/2kx/Spyre/pract_data/*'
 #path = '/home/jacky/2kx/Spyre/larger_pract/*/*'
+
+# Network Params #
 num_mfccs = 13
 prevcost = 0
-
 num_classes = 28
-
 num_hidden = 100
 learning_rate = 1e-3
 momentum = 0.9
 num_layers = 2
+##############
 
-# Constants
-SPACE_TOKEN = '<space>'
-SPACE_INDEX = 0
-FIRST_INDEX = ord('a') - 1  # 0 is reserved to space
-
-print(time.strftime('[%H:%M:%S]'), 'Parsing training directory... ')
-dr = data_util.load_dir(path)
-datasetsize = len(dr[0])
-
+# Training Params #
 num_examples = 1#dr[2]
 num_epochs = 200
 batchsize = 1
 num_batches_per_epoch = int(num_examples/batchsize)
+##############
+
+# Log Params #
+logs_path = '/home/jacky/2kx/Spyre/nsound_git/totalsummary/logs/'+datetime.datetime.fromtimestamp(time.time()).strftime('%H:%M:%S')+'_'+str(batchsize)+'_'+str(num_epochs)
+savepath = '/home/jacky/2kx/Spyre/nsound_git/ckpt'
+RESTOREMODEL = False
+#RESTOREMODEL = True
+##############
 
 print(time.strftime('[%H:%M:%S]'), 'Parsing testing directory... ')
 t_dr = data_util.load_dir(test_path)
 testsetsize = len(t_dr[0])
 testbatchsize = batchsize*10
 
-logs_path = '/home/jacky/2kx/Spyre/nsound_git/totalsummary/logs/'+datetime.datetime.fromtimestamp(time.time()).strftime('%H:%M:%S')+'_'+str(batchsize)+'_'+str(num_epochs)
+print(time.strftime('[%H:%M:%S]'), 'Parsing training directory... ')
+dr = data_util.load_dir(path)
+datasetsize = len(dr[0])
 
 print(time.strftime('[%H:%M:%S]'), 'Loading network functions... ')
 graph = tf.Graph()
@@ -126,8 +132,16 @@ with tf.Session(graph=graph) as sess:
     train_writer = tf.summary.FileWriter(logs_path+'/TRAIN', graph=sess.graph)
     test_writer = tf.summary.FileWriter(logs_path+'/TEST', graph=sess.graph)
     tf.global_variables_initializer().run()
+    saver = tf.train.Saver()
     run_options = tf.RunOptions(trace_level=tf.RunOptions.FULL_TRACE)
     run_metadata = tf.RunMetadata()
+
+    if RESTOREMODEL == True:
+        if os.path.exists(savepath):
+            saver.restore(sess, savepath+'/model.ckpt')
+            print('>>>',time.strftime('[%H:%M:%S]'),'Model Restored Succesfully')
+        else:
+            print('>>>',time.strftime('[%H:%M:%S]'),'Model Restore Failed! Make sure the chkpt file exists')
     #Load paths
     print(time.strftime('[%H:%M:%S]'), 'Passing params... ')
     data_util.setParams(batchsize, num_mfccs, num_classes)
@@ -191,4 +205,6 @@ with tf.Session(graph=graph) as sess:
         else:
             log = "Epoch {}/{}  |  Batch Cost : {:.3f}  |  Train Accuracy : {:.3f}%  |  Time Elapsed : {:.3f}s"
             print(log.format(curr_epoch+1, num_epochs, train_cost, 100-(train_ler*100), time.time() - start))
+        save_path = saver.save(sess, savepath+'/model.ckpt')
+        print(">>> Model saved succesfully")
     print('Total Training Time: '+str(time.time() - initstart)+'s')
