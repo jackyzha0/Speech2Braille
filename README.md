@@ -6,13 +6,14 @@ Over 360 million people have disabling hearing loss. One of the main impacts hea
 This experiment entailed creating a machine learning network to convert streams of audio data into a readable output (Braille).
 
 Network Details:
+* Character Wise Decoding
 * Input - TIMIT Dataset
-* Preprocessing for features - 13 MFCCs + 12 Chromograms + 7 Bands of Spectral Contrast + 6 Bands of Tonal Centroid
-Features + Zero Crossing Rate + Spectral Rolloff + Spectral Centroid
-* Reshaping and batching for input - Rank 3 Tensor (batchsize, maxstepsize, num_features)
-* BLSTM Network Dimensions
-* Learning Rate = 1e-2
-* Momentum = 0.9
-* Number of Hidden Layers = 150
-* Network Depth = 2
-* CTC Loss and Decoder
+* Preprocessing for features - 13 MFCCs
+* Reshaping and batching for input - Rank 3 Tensor (batchsize, time, num_features)
+* Deep LSTM Network Hyperparemters
+	* Learning Rate = 1e-3
+	* Momentum = 0.9
+	* Dropout Rate = 0.5
+	* Number of Hidden Layers = 100
+	* Network Depth = 2
+	* CTC Loss and Decoder

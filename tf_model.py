@@ -18,8 +18,6 @@ SPACE_INDEX = 0
 FIRST_INDEX = ord('a') - 1  # 0 is reserved to space
 test_path = '/home/jacky/2kx/Spyre/__data/TIMIT/TEST/*/*'
 path = '/home/jacky/2kx/Spyre/__data/TIMIT/TRAIN/*/*'
-#path = '/home/jacky/2kx/Spyre/pract_data/*'
-#path = '/home/jacky/2kx/Spyre/larger_pract/*/*'
 
 # Network Params #
 num_mfccs = 13
@@ -33,13 +31,14 @@ num_layers = 2
 
 # Training Params #
 num_examples = 1#dr[2]
-num_epochs = 200
+num_epochs = 100
 batchsize = 1
+dropout_keep_prob = 0.5
 num_batches_per_epoch = int(num_examples/batchsize)
 ##############
 
 # Log Params #
-logs_path = '/home/jacky/2kx/Spyre/nsound_git/totalsummary/logs/'+datetime.datetime.fromtimestamp(time.time()).strftime('%H:%M:%S')+'_'+str(batchsize)+'_'+str(num_epochs)
+logs_path = '/home/jacky/2kx/Spyre/nsound_git/totalsummary/logs/'+datetime.datetime.fromtimestamp(time.time()).strftime('%H:%M:%S')+'_'+str(batchsize)+'_'+str(num_epochs)+'_'+str(dropout_keep_prob)
 savepath = '/home/jacky/2kx/Spyre/nsound_git/ckpt'
 RESTOREMODEL = False
 #RESTOREMODEL = True
@@ -57,6 +56,9 @@ datasetsize = len(dr[0])
 print(time.strftime('[%H:%M:%S]'), 'Loading network functions... ')
 graph = tf.Graph()
 with graph.as_default():
+
+    keep_prob = tf.placeholder(tf.float32)
+
     def lstm_cell():
       return tf.contrib.rnn.BasicLSTMCell(num_hidden)
 
@@ -76,8 +78,9 @@ with graph.as_default():
 
     # Stacking rnn cells
     with tf.name_scope('cellStack'):
+        stack = tf.nn.rnn_cell.DropoutWrapper(lstm_cell(), output_keep_prob=keep_prob)
         stack = tf.contrib.rnn.MultiRNNCell([lstm_cell() for _ in range(num_layers)])
-        cell = tf.contrib.rnn.LSTMCell(num_hidden, state_is_tuple=True)
+        #cell = tf.contrib.rnn.LSTMCell(num_hidden, state_is_tuple=True)
         #stack = tf.contrib.rnn.MultiRNNCell([cell] * num_layers,state_is_tuple=True)
 
     # The second output is the last state and we will not use that
@@ -130,7 +133,6 @@ with tf.Session(graph=graph) as sess:
     print("Starting Tensorboard...")
     initstart = time.time()
     train_writer = tf.summary.FileWriter(logs_path+'/TRAIN', graph=sess.graph)
-    test_writer = tf.summary.FileWriter(logs_path+'/TEST', graph=sess.graph)
     tf.global_variables_initializer().run()
     saver = tf.train.Saver()
     run_options = tf.RunOptions(trace_level=tf.RunOptions.FULL_TRACE)
@@ -168,7 +170,8 @@ with tf.Session(graph=graph) as sess:
             #    batch_train_mfccs_img.append(data_util.jpg_image_to_array('/home/jacky/2kx/Spyre/nsound_git/img/'+str(n)+'.jpg'))
             feed = {inputs: batch_train_inputs,
                     targets: batch_train_targets,
-                    seq_len: batch_train_seq_len
+                    seq_len: batch_train_seq_len,
+                    keep_prob: dropout_keep_prob
             #        ,t: batch_train_mfccs_img
                     }
             batch_cost, _ = sess.run([cost, optimizer], feed)
@@ -184,7 +187,7 @@ with tf.Session(graph=graph) as sess:
         train_cost /= num_examples
         train_ler /= num_examples
 
-        if (curr_epoch % 1 == 0):
+        if (curr_epoch % 10 == 0):
             #Testing
             print('>>>',time.strftime('[%H:%M:%S]'), 'Evaluating Test Accuracy...')
             t_index = random.sample(range(0, testsetsize), testbatchsize)
@@ -196,10 +199,10 @@ with tf.Session(graph=graph) as sess:
             batch_test_targets = data_util.sparse_tuple_from(test_targets[newindex])
             t_feed = {inputs: batch_test_inputs,
                     targets: batch_test_targets,
-                    seq_len: batch_test_seq_len
+                    seq_len: batch_test_seq_len,
+                    keep_prob: 1.0
                     }
             test_ler = sess.run(ler, feed_dict=t_feed)
-            print(test_ler,train_ler)
             log = "Epoch {}/{}  |  Batch Cost : {:.3f}  |  Train Accuracy : {:.3f}%  |  Test Accuracy : {:.3f}%  |  Time Elapsed : {:.3f}s"
             print(log.format(curr_epoch+1, num_epochs, train_cost, 100-(train_ler*100), 100-(test_ler*100), time.time() - start))
         else:
