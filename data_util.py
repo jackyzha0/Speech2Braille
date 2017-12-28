@@ -95,7 +95,9 @@ def features(rawsnd, num) :
         *Spectral Centroid"""
     x, sample_rate = librosa.load(rawsnd)
     s_tft = np.abs(librosa.stft(x))
-    ft = lib_feat.mfcc(y=x, sr=sample_rate, n_mfcc=num).T
+    ft = lib_feat.mfcc(y=x, sr=sample_rate, n_mfcc=num+1).T
+    ft = np.delete(ft,0,1)
+    ft -= (np.mean(ft, axis=0) + 1e-8)
     return (ft)
 
 def load_dir(fp):
@@ -244,5 +246,4 @@ def fake_data(num_examples, num_features, num_labels, min_size = 10, max_size=10
 
     # Generating random label, the size must be less or equal than timestep in order to achieve the end of the lattice in max timestep
     labels = np.asarray([np.random.randint(0, num_labels, np.random.randint(1, inputs[i].shape[0], (1,))).astype(np.int64) for i, _ in enumerate(timesteps)])
-    r_saveImg(inputs)
     return inputs,labels
