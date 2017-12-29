@@ -19,6 +19,8 @@ from PIL import Image
 print('[OK] PIL ')
 import scipy
 print('[OK] scipy ')
+import os
+print('[OK] os ')
 
 batchsize = -1
 num_mfccs = -1
@@ -118,8 +120,11 @@ def features(rawsnd, num) :
         Return a num x max_stepsize*32 feature vector
     """
     x, sample_rate = librosa.load(rawsnd)
-    s_tft = np.abs(librosa.stft(x))
+    #s_tft = np.abs(librosa.stft(x))
     ft = lib_feat.mfcc(y=x, sr=sample_rate, n_mfcc=num+1).T
+    t_ft = ft
+    ft = np.delete(np.append(ft,lib_feat.delta(t_ft),axis=1),0,1)
+    ft = np.delete(np.append(ft,lib_feat.delta(t_ft,order=2),axis=1),0,1)
     ft = np.delete(ft,0,1)
     ft -= (np.mean(ft, axis=0) + 1e-8)
     return (ft)
@@ -160,7 +165,7 @@ def load_dir(fp):
         print(time.strftime('[%H:%M:%S]'), 'Succesfully loaded data set of size',len(raw_audio))
         return raw_audio,text,len(raw_audio)
 
-def next_Data(path):
+def next_Data(path,test):
     """Returns array of features for training
     Args:
         path: path to audio file to compute
@@ -168,7 +173,7 @@ def next_Data(path):
         featurearr: rank 2 tensor of maxsize * num_features
     """
     z = path.replace('/','').split("TIMIT")[1][:-4]
-    if repickle and not os.path.exists(picklepath+'/'+z+'.npy'):
+    if test or repickle or not os.path.exists(picklepath+'/'+z+'.npy'):
         featurearr = []
         ftrtmp=features(path, num_mfccs)
         featurearr.append(ftrtmp)
@@ -178,7 +183,7 @@ def next_Data(path):
         featurearr = np.load(picklepath+'/'+z+'.npy')
     return featurearr
 
-def next_miniBatch(index,patharr):
+def next_miniBatch(index,patharr,test=False):
     """Returns array of size batchsize with features for training
     Args:
         index: current position in training
@@ -188,10 +193,10 @@ def next_miniBatch(index,patharr):
     minibatch = []
     for j in index:
         #tmp = next_Data(patharr[j])
-        tmp = next_Data(patharr[j])
+        tmp = next_Data(patharr[j],test)
         minibatch.append(np.array(tmp[0]))
     minibatch = np.array(minibatch)
-    #saveImg(minibatch)
+    saveImg(minibatch)
     return np.asarray(minibatch)
 def next_target_miniBatch(index,patharr):
     minibatch = []

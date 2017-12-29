@@ -16,6 +16,10 @@ import numpy as np
 from PIL import Image
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
+config = tf.ConfigProto()
+config.intra_op_parallelism_threads = 8
+config.inter_op_parallelism_threads = 8
+
 with tf.device("/GPU:0"):
 
     #PARAMS
@@ -30,10 +34,10 @@ with tf.device("/GPU:0"):
     num_mfccs = 13
     prevcost = 0
     num_classes = 28
-    num_hidden = 10
-    learning_rate = 1e-3
-    momentum = 0.9
-    num_layers = 1
+    num_hidden = 100
+    learning_rate = 1e-2
+    momentum = 0.5
+    num_layers = 2
     ##############
 
     # Pickle Settings #
@@ -48,9 +52,9 @@ with tf.device("/GPU:0"):
 
     # Training Params #
     num_examples = dr[2]
-    num_epochs = 1
+    num_epochs = 10
     batchsize = 1
-    dropout_keep_prob = 0.5
+    dropout_keep_prob = 0.8
     num_batches_per_epoch = int(num_examples/batchsize)
     ##############
 
@@ -66,7 +70,7 @@ with tf.device("/GPU:0"):
     print(time.strftime('[%H:%M:%S]'), 'Parsing testing directory... ')
     t_dr = data_util.load_dir(test_path)
     testsetsize = len(t_dr[0])
-    testbatchsize = batchsize
+    testbatchsize = 128
 
     print(time.strftime('[%H:%M:%S]'), 'Loading network functions... ')
     graph = tf.Graph()
@@ -75,14 +79,14 @@ with tf.device("/GPU:0"):
         keep_prob = tf.placeholder(tf.float32)
 
         def lstm_cell():
-          return tf.contrib.rnn.BasicLSTMCell(num_hidden)
+          return tf.contrib.rnn.BasicLSTMCell(num_hidden, forget_bias=1.0, activation=tf.sigmoid)
 
         #Network Code is heavily influenced by igormq's ctc_tensorflow example
         with tf.name_scope('inputLength'):
             seq_len = tf.placeholder(tf.int32, [None])
 
         with tf.name_scope('input'):
-            inputs = tf.placeholder(tf.float32, [None, None, num_mfccs])
+            inputs = tf.placeholder(tf.float32, [None, None, num_mfccs*3])
             targets = tf.sparse_placeholder(tf.int32)
             tf.summary.histogram("input",inputs)
             tf.summary.histogram("targets",tf.sparse_to_dense(targets.indices,targets.dense_shape,targets.values))
@@ -143,7 +147,7 @@ with tf.device("/GPU:0"):
         merged = tf.summary.merge_all()
 
 # Launch the graph
-with tf.Session(graph=graph) as sess:
+with tf.Session(graph=graph, config=config) as sess:
     print("Starting Tensorboard...")
     initstart = time.time()
     train_writer = tf.summary.FileWriter(logs_path+'/TRAIN', graph=sess.graph)
@@ -205,7 +209,7 @@ with tf.Session(graph=graph) as sess:
             print('>>>',time.strftime('[%H:%M:%S]'), 'Evaluating Test Accuracy...')
             t_index = random.sample(range(0, testsetsize), testbatchsize)
             test_targets = data_util.next_target_miniBatch(t_index,t_dr[1])
-            test_inputs = data_util.next_miniBatch(t_index,t_dr[0])
+            test_inputs = data_util.next_miniBatch(t_index,t_dr[0],test=True)
             newindex = [i % testbatchsize for i in range(testbatchsize)]
             batch_test_inputs = test_inputs[newindex]
             batch_test_inputs, batch_test_seq_len = data_util.pad_sequences(batch_test_inputs)
@@ -217,8 +221,8 @@ with tf.Session(graph=graph) as sess:
             t_feed = {inputs: batch_test_inputs,
                     targets: batch_test_targets,
                     seq_len: batch_test_seq_len,
-                    keep_prob: 1.0,
-                    t: batch_test_mfccs_img
+                    keep_prob: 1.0
+                    ,t: batch_test_mfccs_img
                     }
             test_ler = sess.run(ler, feed_dict=t_feed)
             log = "Epoch {}/{}  |  Batch Cost : {:.3f}  |  Train Accuracy : {:.3f}%  |  Test Accuracy : {:.3f}%  |  Time Elapsed : {:.3f}s"
