@@ -1,4 +1,8 @@
 # !/usr/local/bin/python
+'''
+Author: github.com/jackyzha0
+All code is self-written unless explicitly stated
+'''
 from __future__ import print_function
 import time
 print(time.strftime('[%H:%M:%S]'), 'Starting network... ')
@@ -32,6 +36,12 @@ with tf.device("/GPU:0"):
     num_layers = 1
     ##############
 
+    # Pickle Settings #
+    pickle_path = 'timit_pickle'
+    repickle = False
+    print(time.strftime('[%H:%M:%S]'), 'Checking for pickled data... ')
+    ##############
+
     print(time.strftime('[%H:%M:%S]'), 'Parsing training directory... ')
     dr = data_util.load_dir(path)
     datasetsize = len(dr[0])
@@ -44,16 +54,14 @@ with tf.device("/GPU:0"):
     num_batches_per_epoch = int(num_examples/batchsize)
     ##############
 
-    # Pickle Settings #
-    gen_new_pickles = True
-    read_from_pickles = False
-
     # Log Params #
-    logs_path = '/home/jacky/2kx/Spyre/nsound_git/totalsummary/logs/'+datetime.datetime.fromtimestamp(time.time()).strftime('%H:%M:%S')+'_'+str(batchsize)+'_'+str(num_epochs)+'_'+str(dropout_keep_prob)
-    savepath = '/home/jacky/2kx/Spyre/nsound_git/totalsummary/ckpt'
+    logs_path = 'totalsummary/logs/'+datetime.datetime.fromtimestamp(time.time()).strftime('%H:%M:%S')+'_'+str(batchsize)+'_'+str(num_epochs)+'_'+str(dropout_keep_prob)
+    savepath = 'totalsummary/ckpt'
     RESTOREMODEL = False
     #RESTOREMODEL = True
     ##############
+    print(time.strftime('[%H:%M:%S]'), 'Passing params... ')
+    data_util.setParams(batchsize, num_mfccs, num_classes,repickle,pickle_path)
 
     print(time.strftime('[%H:%M:%S]'), 'Parsing testing directory... ')
     t_dr = data_util.load_dir(test_path)
@@ -152,8 +160,6 @@ with tf.Session(graph=graph) as sess:
         else:
             print('>>>',time.strftime('[%H:%M:%S]'),'Model Restore Failed! Make sure the chkpt file exists')
     #Load paths
-    print(time.strftime('[%H:%M:%S]'), 'Passing params... ')
-    data_util.setParams(batchsize, num_mfccs, num_classes)
     for curr_epoch in range(num_epochs):
         print('>>>',time.strftime('[%H:%M:%S]'), 'Epoch',curr_epoch+1,'/',num_epochs)
         train_cost = train_ler = 0
@@ -174,7 +180,7 @@ with tf.Session(graph=graph) as sess:
             batch_train_mfccs_img = []
             data_util.saveImg(batch_train_inputs)
             for n in range(0,batchsize):
-                batch_train_mfccs_img.append(data_util.jpg_image_to_array('/home/jacky/2kx/Spyre/nsound_git/img/'+str(n)+'.jpg'))
+                batch_train_mfccs_img.append(data_util.jpg_image_to_array('img/'+str(n)+'.jpg'))
             feed = {inputs: batch_train_inputs,
                     targets: batch_train_targets,
                     seq_len: batch_train_seq_len,
@@ -207,7 +213,7 @@ with tf.Session(graph=graph) as sess:
             batch_test_mfccs_img = []
             data_util.r_saveImg(batch_test_inputs)
             for n in range(0,testbatchsize):
-                batch_test_mfccs_img.append(data_util.jpg_image_to_array('/home/jacky/2kx/Spyre/nsound_git/r_img/'+str(n)+'.jpg'))
+                batch_test_mfccs_img.append(data_util.jpg_image_to_array('r_img/'+str(n)+'.jpg'))
             t_feed = {inputs: batch_test_inputs,
                     targets: batch_test_targets,
                     seq_len: batch_test_seq_len,

@@ -16,32 +16,44 @@ print('[OK] tensorflow ')
 import glob
 print('[OK] glob ')
 from PIL import Image
+print('[OK] PIL ')
 import scipy
+print('[OK] scipy ')
 
 batchsize = -1
 num_mfccs = -1
 num_classes = -1
+repickle = False
+picklepath = ''
 
 print(time.strftime('[%H:%M:%S]'), 'Loading helper functions...')
 
-def setParams(_batchsize, _num_mfccs, _num_classes):
+def setParams(_batchsize, _num_mfccs, _num_classes,_repickle,_picklepath):
     """Set Training Parameters
-    Args:+28
+    Args:
         _batchsize: size of mini batches
         _num_mfccs: number of mel-spectrum ceptral coefficients to compute
         _num_classes: total output types - 1
-        _max_timesteps: max timesteps for minibatch/enveloping
-        _timesteplen: max length of timesteps for minibatch/enveloping
-        """
+        _repickle: check if recreating pickles is necessary
+        _picklepath: path to pickles
+    Returns:
+        nothing
+    """
     global batchsize
     global num_mfccs
     global num_classes
+    global repickle
+    global picklepath
     batchsize = _batchsize
     num_mfccs = _num_mfccs
     num_classes = _num_classes
+    repickle = _repickle
+    picklepath = _picklepath
 
 def sparse_tuple_from(sequences, dtype=np.int32):
-    """Create a sparse representention of x. For handling one-hot vector
+    """
+    Author: github.com/igormq
+    Create a sparse representention of input array. For handling one-hot vector in targets
     Args:
         sequences: a list of lists of type dtype where each element is a sequence
     Returns:
@@ -59,6 +71,12 @@ def sparse_tuple_from(sequences, dtype=np.int32):
     return indices, values, shape
 
 def jpg_image_to_array(image_path):
+    """Creates an array given path to image
+    Args:
+        image_path: system path to image
+    Returns:
+        height x width 2D array with values from 0 to 255
+    """
     img = Image.open(image_path).convert('L')  # convert image to 8-bit grayscale
     WIDTH, HEIGHT = img.size
     data = list(img.getdata()) # convert image data to a list of integers
@@ -67,16 +85,28 @@ def jpg_image_to_array(image_path):
     return np.expand_dims(data, axis=4)
 
 def r_saveImg(arr):
+    """Saves testing batch images to disk
+    Args:
+        arr: array to save
+    Returns:
+        nothing
+    """
     n=0
     for i in arr:
         im = scipy.misc.toimage(i)
-        im.save('/home/jacky/2kx/Spyre/nsound_git/r_img/'+str(n)+'.jpg')
+        im.save('r_img/'+str(n)+'.jpg')
         n+=1
 def saveImg(arr):
+    """Saves training images to disk
+    Args:
+        arr: array to save
+    Returns:
+        nothing
+    """
     n=0
     for i in arr:
         im = scipy.misc.toimage(i)
-        im.save('/home/jacky/2kx/Spyre/nsound_git/img/'+str(n)+'.jpg')
+        im.save('img/'+str(n)+'.jpg')
         n+=1
 
 def features(rawsnd, num) :
@@ -85,14 +115,8 @@ def features(rawsnd, num) :
         rawsnd : array with string paths to .wav files
         num : numbers of mfccs to compute
     Returns:
-        Return a (num+28,max_stepsize*32)-dimensional Tensorflow feature vector, and length in
-        *num Amount of Mel Frequency Ceptral Coefficients
-        *12 Chromagrams
-        *7 bands of Spectral Contrast
-        *6 bands of Tonal Centroid Features (Tonnetz)
-        *Zero Crossing Rate
-        *Spectral Rolloff
-        *Spectral Centroid"""
+        Return a num x max_stepsize*32 feature vector
+    """
     x, sample_rate = librosa.load(rawsnd)
     s_tft = np.abs(librosa.stft(x))
     ft = lib_feat.mfcc(y=x, sr=sample_rate, n_mfcc=num+1).T
@@ -101,15 +125,15 @@ def features(rawsnd, num) :
     return (ft)
 
 def load_dir(fp):
-    """Load raw paths data into arrays
+    """Load raw paths data into arrays and returns important info
     Args:
         fp : string path to data
     Returns:
         Returns array of loaded files
         loaded[0] = sound
-        loaded[1] = phonemes
-        loaded[2] = words
-        loaded[3] = text"""
+        loaded[1] = text
+        loaded[2] = dataset size
+    """
     with tf.name_scope('raw_data'):
         ind = 0
         raw_audio = []
@@ -121,8 +145,8 @@ def load_dir(fp):
                     ind+=1
                     if (".wav" in __file):
                         raw_audio.append(__file)
-                    if (".TXT" in __file):
-                        with open(__file) as f:
+                        __targ = __file[:-4]+str('.TXT')
+                        with open(__targ) as f:
                             for line in f:
                                 res = ''.join([i for i in line if not i.isdigit()])
                         res = (list(res[2:-1].lower().translate(None, string.punctuation)))
@@ -141,11 +165,17 @@ def next_Data(path):
     Args:
         path: path to audio file to compute
     Returns:
-        features = rank 2 tensor of maxsize * num_features+28
+        featurearr: rank 2 tensor of maxsize * num_features
     """
-    featurearr = []
-    ftrtmp=features(path, num_mfccs)
-    featurearr.append(ftrtmp)
+    z = path.replace('/','').split("TIMIT")[1][:-4]
+    if repickle and not os.path.exists(picklepath+'/'+z+'.npy'):
+        featurearr = []
+        ftrtmp=features(path, num_mfccs)
+        featurearr.append(ftrtmp)
+        np.save(picklepath+'/'+z,featurearr)
+        print(time.strftime('[%H:%M:%S]'), 'Pickle saved to',picklepath+'/'+z[:-4])
+    else:
+        featurearr = np.load(picklepath+'/'+z+'.npy')
     return featurearr
 
 def next_miniBatch(index,patharr):
@@ -153,15 +183,13 @@ def next_miniBatch(index,patharr):
     Args:
         index: current position in training
     Returns:
-        features = rank 3 tensor of batchsize * maxsize * num_features+28
+        features: rank 3 tensor of batchsize * maxsize * num_features
     """
     minibatch = []
     for j in index:
         #tmp = next_Data(patharr[j])
         tmp = next_Data(patharr[j])
         minibatch.append(np.array(tmp[0]))
-        #print(time.strftime('[%H:%M:%S]'), 'Passed input tensor',batchsize)
-        #print(time.strftime('[%H:%M:%S]'), 'Passed input tensor',np.asarray(np.array(tmp[0])).shape)
     minibatch = np.array(minibatch)
     #saveImg(minibatch)
     return np.asarray(minibatch)
@@ -179,23 +207,25 @@ def next_target_miniBatch(index,patharr):
 
 def pad_sequences(sequences, maxlen=None, dtype=np.float32,
                   padding='post', truncating='post', value=0.):
-    '''Pads each sequence to the same length: the length of the longest
+    '''
+    Author: github.com/igormq
+    Pads each sequence to the same length: the length of the longest
     sequence.
-        If maxlen is provided, any sequence longer than maxlen is truncated to
-        maxlen. Truncation happens off either the beginning or the end
-        (default) of the sequence. Supports post-padding (default) and
-        pre-padding.
-        Args:
-            sequences: list of lists where each element is a sequence
-            maxlen: int, maximum length
-            dtype: type to cast the resulting sequence.
-            padding: 'pre' or 'post', pad either before or after each sequence.
-            truncating: 'pre' or 'post', remove values from sequences larger
-            than maxlen either in the beginning or in the end of the sequence
-            value: float, value to pad the sequences to the desired value.
-        Returns
-            x: numpy array with dimensions (number_of_sequences, maxlen)
-            lengths: numpy array with the original sequence lengths
+    If maxlen is provided, any sequence longer than maxlen is truncated to
+    maxlen. Truncation happens off either the beginning or the end
+    (default) of the sequence. Supports post-padding (default) and
+    pre-padding.
+    Args:
+        sequences: list of lists where each element is a sequence
+        maxlen: int, maximum length
+        dtype: type to cast the resulting sequence.
+        padding: 'pre' or 'post', pad either before or after each sequence.
+        truncating: 'pre' or 'post', remove values from sequences larger
+        than maxlen either in the beginning or in the end of the sequence
+        value: float, value to pad the sequences to the desired value.
+    Returns
+        x: numpy array with dimensions (number_of_sequences, maxlen)
+        lengths: numpy array with the original sequence lengths
     '''
     lengths = np.asarray([len(s) for s in sequences], dtype=np.int64)
 
@@ -237,13 +267,20 @@ def pad_sequences(sequences, maxlen=None, dtype=np.float32,
     return x, lengths
 
 def fake_data(num_examples, num_features, num_labels, min_size = 10, max_size=100):
+    """Generates random noise as input (for debug purposes)
+    Args:
+        num_examples: number of instances of data
+        num_features: number of fake features to generate
+        num_labels: number of classes-1
+        min_size: minimum timestep length of fake data
+        max_size: max timestep length
+    Returns:
+        inputs: num_examples x num_features x max_size
+        labels: num_examples x max_size [from 0 -> num_labels]
+    """
     np.random.seed(0)
-    # Generating different timesteps for each fake data
     timesteps = np.random.randint(min_size, max_size, (num_examples,))
-    # Generating random input
     inputs = np.asarray([np.random.randn(t, num_features).astype(np.float32) for t in timesteps])
     #inputs = np.asarray([np.ones((t, num_features))*255 for t in timesteps])
-
-    # Generating random label, the size must be less or equal than timestep in order to achieve the end of the lattice in max timestep
     labels = np.asarray([np.random.randint(0, num_labels, np.random.randint(1, inputs[i].shape[0], (1,))).astype(np.int64) for i, _ in enumerate(timesteps)])
     return inputs,labels
