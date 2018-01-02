@@ -29,6 +29,10 @@ import scipy
 print('[OK] scipy ')
 import os
 print('[OK] os ')
+from tensorpack import *
+print('[OK] tensorpack ')
+import sonnet as snt
+print('[OK] sonnet ')
 #os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
 config=tf.ConfigProto(gpu_options=tf.GPUOptions(allow_growth=True))
@@ -48,10 +52,10 @@ with tf.device("/cpu:0"):
     # Network Params #
     num_mfccs = 13
     num_classes = 28
-    num_hidden = 100
-    learning_rate = 1e-4
-    momentum = 0.3
-    num_layers = 3
+    num_hidden = 50
+    learning_rate = 1e-2
+    momentum = 0.9
+    num_layers = 1
     ##############
 
     # Pickle Settings #
@@ -103,9 +107,9 @@ with tf.device("/cpu:0"):
 
     # Training Params #
     num_examples = dr[2]
-    num_epochs = 30
-    batchsize = 8
-    dropout_keep_prob = 1.0
+    num_epochs = 40
+    batchsize = 64
+    dropout_keep_prob = 0.8
     num_batches_per_epoch = int(num_examples/batchsize)
     ##############
 
@@ -113,13 +117,12 @@ with tf.device("/cpu:0"):
     logs_path = 'totalsummary/logs/'+datetime.datetime.fromtimestamp(time.time()).strftime('%H:%M:%S')+'_'+str(batchsize)+'_'+str(num_epochs)+'_'+str(dropout_keep_prob)
     savepath = 'totalsummary/ckpt'
     RESTOREMODEL = False
-    RESTOREMODEL = True
     ##############
 
     print(time.strftime('[%H:%M:%S]'), 'Parsing testing directory... ')
     t_dr = load_dir(test_path)
     testsetsize = len(t_dr[0])
-    testbatchsize = 16
+    testbatchsize = 32
 
     # Functions #
     def next_miniBatch(index,patharr,test=False):
@@ -325,11 +328,12 @@ with tf.device("/gpu:0"):
         #tf.set_random_seed(0)
         keep_prob = tf.placeholder(tf.float32)
         initializer = tf.contrib.layers.xavier_initializer()
+        training = tf.placeholder(tf.bool)
         def lstm_cell():
             #return tf.contrib.rnn.BasicLSTMCell(num_hidden, forget_bias=keep_prob, activation=tf.tanh)
-            return tf.contrib.rnn.LayerNormBasicLSTMCell(num_hidden,forget_bias=1.0,activation=tf.tanh,dropout_keep_prob=keep_prob)
             #return tf.contrib.rnn.LSTMCell(num_hidden,initializer=initializer,forget_bias=keep_prob, activation=tf.tanh)
-
+            #return tf.contrib.rnn.LayerNormBasicLSTMCell(num_hidden,forget_bias=1.0,activation=tf.tanh,dropout_keep_prob=keep_prob)
+            return snt.BatchNormLSTM(num_hidden,forget_bias=1.0)
         #Network Code is heavily influenced by igormq's ctc_tensorflow example
         with tf.name_scope('inputLength'):
             seq_len = tf.placeholder(tf.int32, [None])
@@ -337,43 +341,41 @@ with tf.device("/gpu:0"):
         with tf.name_scope('input'):
             inputs = tf.placeholder(tf.float32, [None, None, num_mfccs])
             targets = tf.sparse_placeholder(tf.int32)
-            tf.summary.histogram("input",inputs)
-            tf.summary.histogram("targets",tf.sparse_to_dense(targets.indices,targets.dense_shape,targets.values))
-
-        if logImages:
-            with tf.name_scope('mfccs'):
-                t = tf.placeholder(tf.float32, [None, None, None,None])
-                tf.summary.image("mfccs",t,batchsize)
+            #tf.summary.histogram("input",inputs)
+            #tf.summary.histogram("targets",tf.sparse_to_dense(targets.indices,targets.dense_shape,targets.values))
 
         # Stacking rnn cells
         with tf.name_scope('cellStack'):
-            #stack = tf.contrib.rnn.LayerNormBasicLSTMCell(num_hidden,forget_bias=1.0,activation=tf.sigmoid,dropout_keep_prob=keep_prob)
-            #stack = tf.contrib.cudnn_rnn.CudnnLSTM(num_layers,num_hidden,num_mfccs,direction=CUDNN_RNN_BIDIRECTIONAL,dropout=dropout_keep_prob)
-            #cell = tf.contrib.rnn.LSTMCell(num_hidden, state_is_tuple=True)
-            #stack = tf.contrib.rnn.MultiRNNCell([cell] * num_layers,state_is_tuple=True)
-            stack = tf.contrib.rnn.MultiRNNCell([lstm_cell() for _ in range(num_layers)])
+            #stack = lstm_cell()
+            stack_fw = tf.contrib.rnn.MultiRNNCell([lstm_cell().with_batch_norm_control(is_training=training) for _ in range(num_layers)])
+            stack_bw = tf.contrib.rnn.MultiRNNCell([lstm_cell().with_batch_norm_control(is_training=training) for _ in range(num_layers)])
 
-        outputs, _ = tf.nn.dynamic_rnn(stack, inputs, seq_len, dtype=tf.float32)
+        (outputs_fw, outputs_bw), last_state = tf.nn.bidirectional_dynamic_rnn(stack_fw,stack_bw, inputs, seq_len,dtype=tf.float32)
+        outputs = tf.concat(axis=2, values=[outputs_fw, outputs_bw])
+
+        #outputs, _ = tf.nn.dynamic_rnn(stack, inputs, seq_len, dtype=tf.float32)
         shape = tf.shape(inputs)
         batch_s, TF_max_timesteps = shape[0], shape[1]
 
         # Reshaping to apply the same weights over the timesteps
         with tf.name_scope('outputs'):
-            outputs = tf.reshape(outputs, [-1, num_hidden])
+            #outputs = tf.reshape(outputs, [-1, num_hidden])
+            outputs = tf.reshape(outputs, [-1, num_hidden*2])
 
-        with tf.name_scope('weights'):
-            #W = tf.Variable(initializer([num_hidden,num_classes]))
-            #W = tf.Variable(tf.truncated_normal([num_hidden,num_classes],stddev=0.1))
-            W = tf.Variable(tf.random_normal([num_hidden, num_classes],stddev=0.3))
-            tf.summary.histogram('weightsHistogram', W)
+        #with tf.name_scope('weights'):
+        #    W = tf.Variable(initializer([num_hidden,num_classes]))
+        #    W = tf.Variable(tf.truncated_normal([num_hidden,num_classes],stddev=0.1))
+        #    W = tf.Variable(tf.random_normal([num_hidden, num_classes],stddev=0.3))
+        #    tf.summary.histogram('weightsHistogram', W)
         with tf.name_scope('biases'):
             #b = tf.Variable(tf.constant(0., shape=[num_classes]))
             b = tf.Variable(initializer([num_classes]))
-            tf.summary.histogram('biasesHistogram', b)
+            #tf.summary.histogram('biasesHistogram', b)
 
         with tf.name_scope('logits'):
             # Doing the affine projection
-            logits = tf.matmul(outputs, W) + b
+            #logits = tf.matmul(outputs, W) + b
+            logits = FullyConnected('fc', outputs, num_classes, nl=tf.nn.relu,W_init=initializer)#+b
             # Reshaping back to the original shape
             logits = tf.reshape(logits, [batch_s, -1, num_classes])
             # Time major
@@ -390,7 +392,11 @@ with tf.device("/gpu:0"):
             optimizer = tf.train.AdamOptimizer(learning_rate,momentum)#.minimize(loss)
             #optimizer = tf.train.AdagradOptimizer(learning_rate)
             gvs = optimizer.compute_gradients(cost)
-            capped_gvs = [(tf.clip_by_value(grad, -1., 1.), var) for grad, var in gvs]
+            def ClipIfNotNone(grad):
+                if grad is None:
+                    return grad
+                return tf.clip_by_value(grad, -1, 1)
+            capped_gvs = [(ClipIfNotNone(grad), var) for grad, var in gvs]
             train_optimizer = optimizer.apply_gradients(capped_gvs)
 
         with tf.name_scope('decoder'):
@@ -440,81 +446,66 @@ with tf.device("/cpu:0"):
                 batch_train_inputs, batch_train_seq_len = pad_sequences(batch_train_inputs)
                 # Converting to sparse representation so as to to feed SparseTensor input
                 batch_train_targets = sparse_tuple_from(train_targets[newindex])
-                if logImages:
-                    batch_train_mfccs_img = []
-                    saveImg(batch_train_inputs)
-                    for n in range(0,batchsize):
-                        batch_train_mfccs_img.append(jpg_image_to_array('img/'+str(n)+'.jpg'))
                 feed = {inputs: batch_train_inputs,
                         targets: batch_train_targets,
                         seq_len: batch_train_seq_len,
-                        keep_prob: dropout_keep_prob
-                #        ,t: batch_train_mfccs_img
+                        keep_prob: dropout_keep_prob,
+                        training: True
                         }
                 batch_cost, _, l = sess.run([cost, train_optimizer, ler], feed)
                 train_cost += batch_cost*batchsize
                 train_ler += l*batchsize
                 print('['+str(curr_epoch)+']','  >>>',time.strftime('[%H:%M:%S]'), 'Batch',batch+1,'/',num_batches_per_epoch,'@Cost',batch_cost,'Time Elapsed',time.time()-t_time,'s')
                 t_time=time.time()
+                if (batch % 32 == 0):
+                    summary = sess.run(merged, feed_dict=feed, options=run_options, run_metadata=run_metadata)
+                    train_writer.add_summary(summary, int(batch)+int(curr_epoch*num_batches_per_epoch))
+                    train_writer.flush()
 
             # Metrics mean
             train_cost /= num_examples
             train_ler /= num_examples
-            summary = sess.run(merged, feed_dict=feed, options=run_options, run_metadata=run_metadata)
-            train_writer.add_summary(summary, int(batch)+int(curr_epoch*num_batches_per_epoch))
-            train_writer.add_run_metadata(run_metadata, 'step%03d' % int(batch+(curr_epoch*num_batches_per_epoch)))
-            train_writer.flush()
-
-            if (curr_epoch % 1 == 0):
-                #Testing
-                print('>>>',time.strftime('[%H:%M:%S]'), 'Evaluating Test Accuracy...')
-                t_index = random.sample(range(0, testsetsize), testbatchsize)
-                test_targets = next_target_miniBatch(t_index,t_dr[1])
-                test_inputs = next_miniBatch(t_index,t_dr[0],test=True)
-                newindex = [i % testbatchsize for i in range(testbatchsize)]
-                batch_test_inputs = test_inputs[newindex]
-                batch_test_inputs, batch_test_seq_len = pad_sequences(batch_test_inputs)
-                batch_test_targets = sparse_tuple_from(test_targets[newindex])
-                if logImages:
-                    batch_test_mfccs_img = []
-                    r_saveImg(batch_test_inputs)
-                    for n in range(0,testbatchsize):
-                        batch_test_mfccs_img.append(jpg_image_to_array('r_img/'+str(n)+'.jpg'))
-                t_feed = {inputs: batch_test_inputs,
-                        targets: batch_test_targets,
-                        seq_len: batch_test_seq_len,
-                        keep_prob: 1.0
-                #        ,t: batch_test_mfccs_img
-                        }
-                test_ler,d = sess.run((ler,decoded[0]), feed_dict=t_feed)
-                dense_decoded = tf.sparse_tensor_to_dense(d, default_value=-1).eval(session=sess)
-                for i, seq in enumerate(dense_decoded):
-                    seq = [s for s in seq if s != -1]
-                    tmp_o = ""
-                    for q in test_targets[i]:
-                        if q==0:
-                            tmp_o+=" "
-                        else:
-                            tmp_o+=chr(q+96)
-                    tmp_d = ""
-                    for k in seq:
-                        if k==0:
-                            tmp_d+=" "
-                        else:
-                            tmp_d+=chr(k+96)
-                    print('Sequence %d' % i)
-                    print('\t Original:\n%s' % tmp_o)
-                    print('\t Decoded:\n%s' % tmp_d)
-                    print('Done!')
-                log = "Epoch {}/{}  |  Batch Cost : {:.3f}  |  Train Accuracy : {:.3f}%  |  Test Accuracy : {:.3f}%  |  Time Elapsed : {:.3f}s"
-                print(log.format(curr_epoch+1, num_epochs, train_cost, 100-(train_ler*100), 100-(test_ler*100), time.time() - start))
-                t_summary = sess.run(merged, feed_dict=t_feed, options=run_options, run_metadata=run_metadata)
-                test_writer.add_summary(t_summary, int(batch)+int(curr_epoch*num_batches_per_epoch))
-                test_writer.add_run_metadata(run_metadata, 'step%03d' % int(batch+(curr_epoch*num_batches_per_epoch)))
-                test_writer.flush()
-            else:
-                log = "Epoch {}/{}  |  Batch Cost : {:.3f}  |  Train Accuracy : {:.3f}%  |  Time Elapsed : {:.3f}s"
-                print(log.format(curr_epoch+1, num_epochs, train_cost, 100-(train_ler*100), time.time() - start))
+            #Testing
+            print('>>>',time.strftime('[%H:%M:%S]'), 'Evaluating Test Accuracy...')
+            t_index = random.sample(range(0, testsetsize), testbatchsize)
+            test_targets = next_target_miniBatch(t_index,t_dr[1])
+            test_inputs = next_miniBatch(t_index,t_dr[0],test=True)
+            newindex = [i % testbatchsize for i in range(testbatchsize)]
+            batch_test_inputs = test_inputs[newindex]
+            batch_test_inputs, batch_test_seq_len = pad_sequences(batch_test_inputs)
+            batch_test_targets = sparse_tuple_from(test_targets[newindex])
+            t_feed = {inputs: batch_test_inputs,
+                    targets: batch_test_targets,
+                    seq_len: batch_test_seq_len,
+                    keep_prob: 1.0,
+                    training: False
+                    }
+            test_ler,d = sess.run((ler,decoded[0]), feed_dict=t_feed)
+            dense_decoded = tf.sparse_tensor_to_dense(d, default_value=-1).eval(session=sess)
+            for i, seq in enumerate(dense_decoded):
+                seq = [s for s in seq if s != -1]
+                tmp_o = ""
+                for q in test_targets[i]:
+                    if q==0:
+                        tmp_o+=" "
+                    else:
+                        tmp_o+=chr(q+96)
+                tmp_d = ""
+                for k in seq:
+                    if k==0:
+                        tmp_d+=" "
+                    else:
+                        tmp_d+=chr(k+96)
+                print('Sequence %d' % i)
+                print('\t Original:\n%s' % tmp_o)
+                print('\t Decoded:\n%s' % tmp_d)
+                print('Done!')
+            log = "Epoch {}/{}  |  Batch Cost : {:.3f}  |  Train Accuracy : {:.3f}%  |  Test Accuracy : {:.3f}%  |  Time Elapsed : {:.3f}s"
+            print(log.format(curr_epoch+1, num_epochs, train_cost, 100-(train_ler*100), 100-(test_ler*100), time.time() - start))
+            t_summary = sess.run(merged, feed_dict=t_feed, options=run_options, run_metadata=run_metadata)
+            test_writer.add_summary(t_summary, int(batch)+int(curr_epoch*num_batches_per_epoch))
+            test_writer.add_run_metadata(run_metadata, 'step%03d' % int(batch+(curr_epoch*num_batches_per_epoch)))
+            test_writer.flush()
             save_path = saver.save(sess, savepath+'/model.ckpt')
             print(">>> Model saved succesfully")
         print('Total Training Time: '+str(time.time() - initstart)+'s')
