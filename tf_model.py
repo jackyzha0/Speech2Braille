@@ -30,8 +30,7 @@ import os
 print('[OK] os ')
 from tensorpack import *
 print('[OK] tensorpack ')
-import sonnet as snt
-print('[OK] sonnet ')
+import BN_LSTMCell
 #os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
 config=tf.ConfigProto(gpu_options=tf.GPUOptions(allow_growth=True))
@@ -49,20 +48,21 @@ with tf.device("/cpu:0"):
     logImages = False
 
     # Network Params #
-    num_mfccs = 13
-    num_classes = 28
-    num_hidden = 128
-    learning_rate = 3e-4
-    momentum = 0.9
-    num_layers = 2
-    BLSTM = True
-    BatchNorm = True
-    LayerNorm = False
-    input_noise = False
-    opt_momentum = False
-    opt_adam = False
-    opt_adag = True
-    opt_sgd = False
+    with tf.variable_scope('main'):
+        num_mfccs = 13
+        num_classes = 28
+        num_hidden = 128
+        learning_rate = 3e-4
+        momentum = 0.9
+        num_layers = 2
+        BLSTM = False
+        BatchNorm = True
+        LayerNorm = False
+        input_noise = False
+        opt_momentum = False
+        opt_adam = False
+        opt_adag = True
+        opt_sgd = False
     ##############
 
     # Pickle Settings #
@@ -113,7 +113,7 @@ with tf.device("/cpu:0"):
     # Training Params #
     num_examples = dr[2]
     num_epochs = 20
-    batchsize = 27#16
+    batchsize = 16
     num_batches_per_epoch = int(num_examples/batchsize)
     ##############
 
@@ -347,18 +347,20 @@ with tf.device("/gpu:0"):
         #tf.set_random_seed(0)
         initializer = tf.contrib.layers.xavier_initializer()
         training = tf.placeholder(tf.bool)
-        def lstm_cell():
+        def lstm_cell(BiDirection=False):
+            i = 1+int(BiDirection)
             if BatchNorm:
-                return snt.BatchNormLSTM(num_hidden,forget_bias=1.0)
+                return BN_LSTMCell.BNLSTMCell(num_hidden*i,training=training)
             if LayerNorm:
-                return tf.contrib.rnn.LayerNormBasicLSTMCell(num_hidden,forget_bias=1.0,activation=tf.tanh)
-            return tf.contrib.rnn.BasicLSTMCell(num_hidden, forget_bias=1.0, activation=tf.tanh)
+                return tf.contrib.rnn.LayerNormBasicLSTMCell(num_hidden*i,forget_bias=1.0,activation=tf.tanh)
+            return tf.contrib.rnn.BasicLSTMCell(num_hidden*i, forget_bias=1.0, activation=tf.tanh)
         #Network Code is heavily influenced by igormq's ctc_tensorflow example
         with tf.name_scope('inputLength'):
             seq_len = tf.placeholder(tf.int32, [None])
 
         with tf.name_scope('input'):
             inputs = tf.placeholder(tf.float32, [None, None, num_mfccs*3])
+            #inputs = tf.expand_dims(inputs, -1)
             targets = tf.sparse_placeholder(tf.int32)
             #tf.summary.histogram("input",inputs)
             #tf.summary.histogram("targets",tf.sparse_to_dense(targets.indices,targets.dense_shape,targets.values))
@@ -366,17 +368,10 @@ with tf.device("/gpu:0"):
         # Stacking rnn cells
         with tf.name_scope('cellStack'):
             if BLSTM:
-                if BatchNorm:
-                    stack_fw = tf.contrib.rnn.MultiRNNCell([lstm_cell().with_batch_norm_control(is_training=training) for _ in range(num_layers)])
-                    stack_bw = tf.contrib.rnn.MultiRNNCell([lstm_cell().with_batch_norm_control(is_training=training) for _ in range(num_layers)])
-                else:
-                    stack_fw = tf.contrib.rnn.MultiRNNCell([lstm_cell() for _ in range(num_layers)])
-                    stack_bw = tf.contrib.rnn.MultiRNNCell([lstm_cell() for _ in range(num_layers)])
+                stack_fw = tf.contrib.rnn.MultiRNNCell([lstm_cell(BiDirection=True) for _ in range(num_layers)])
+                stack_bw = tf.contrib.rnn.MultiRNNCell([lstm_cell(BiDirection=True) for _ in range(num_layers)])
             else:
-                if BatchNorm:
-                    stack = tf.contrib.rnn.MultiRNNCell([lstm_cell().with_batch_norm_control(is_training=training) for _ in range(num_layers)])
-                else:
-                    stack = tf.contrib.rnn.MultiRNNCell([lstm_cell() for _ in range(num_layers)])
+                stack = tf.contrib.rnn.MultiRNNCell([lstm_cell() for _ in range(num_layers)])
 
         if BLSTM:
             (outputs_fw, outputs_bw), last_state = tf.nn.bidirectional_dynamic_rnn(stack_fw,stack_bw, inputs, seq_len,dtype=tf.float32)
@@ -399,18 +394,19 @@ with tf.device("/gpu:0"):
         #    W = tf.Variable(tf.random_normal([num_hidden, num_classes],stddev=0.3))
         #    tf.summary.histogram('weightsHistogram', W)
         with tf.name_scope('biases'):
-            b = tf.Variable(tf.constant(0.1, shape=[num_classes]))
+            b = tf.Variable(tf.constant(0., shape=[num_classes]))
             #b = tf.Variable(initializer([num_classes]))
             #tf.summary.histogram('biasesHistogram', b)
 
         with tf.name_scope('logits'):
             # Doing the affine projection
             #logits = tf.matmul(outputs, W) + b
-            logits = FullyConnected('fc', outputs, num_classes, nl=tf.nn.relu,W_init=initializer)+b
+            logits = FullyConnected('fc', outputs, num_classes, nl=tf.nn.relu,W_init=BN_LSTMCell.orthogonal_initializer())+b
             # Reshaping back to the original shape
             logits = tf.reshape(logits, [batch_s, -1, num_classes])
             # Time major
             logits = tf.transpose(logits, (1, 0, 2))
+            logits = tf.nn.softmax(logits)
         with tf.name_scope('loss'):
             x = tf.nn.ctc_loss(targets, logits, seq_len, ignore_longer_outputs_than_inputs=True)
             #loss = tf.reduce_mean(tf.boolean_mask(x, tf.logical_not(tf.is_inf(x))))
