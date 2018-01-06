@@ -68,7 +68,7 @@ with tf.device("/cpu:0"):
     ##############
 
     # Pickle Settings #
-    pickle_path = 'timit_pickle'
+    pickle_path = './timit_pickle'
     repickle = False
     print(time.strftime('[%H:%M:%S]'), 'Checking for pickled data... ')
     ##############
