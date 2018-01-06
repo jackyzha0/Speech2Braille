@@ -42,8 +42,10 @@ with tf.device("/cpu:0"):
     #SPACE_TOKEN = '<space>'
     #SPACE_INDEX = 0
     #FIRST_INDEX = ord('a')-96-1  # 0 is reserved to space
-    test_path = '/home/jacky/2kx/Spyre/__data/LibriSpeech/test-clean/*/*'
-    path = '/home/jacky/2kx/Spyre/__data/LibriSpeech/train-clean-100/*/*'
+    #test_path = '/home/jacky/2kx/Spyre/__data/LibriSpeech/test-clean/*/*'
+    #path = '/home/jacky/2kx/Spyre/__data/LibriSpeech/train-clean-100/*/*'
+    test_path = '/home/jacky/2kx/Spyre/__data/TIMIT/TEST/*/*'
+    path = '/home/jacky/2kx/Spyre/__data/TIMIT/TRAIN/*/*'
 
     logImages = False
 
@@ -52,16 +54,16 @@ with tf.device("/cpu:0"):
         num_mfccs = 13
         num_classes = 28
         num_hidden = 128
-        learning_rate = 3e-4
-        momentum = 0.9
-        num_layers = 2
+        learning_rate = 1e-3
+        momentum = 0.3
+        num_layers = 1#2
         BLSTM = False
-        BatchNorm = True
+        BatchNorm = False#True
         LayerNorm = False
         input_noise = False
-        opt_momentum = False
+        opt_momentum = True
         opt_adam = False
-        opt_adag = True
+        opt_adag = False
         opt_sgd = False
     ##############
 
@@ -70,7 +72,7 @@ with tf.device("/cpu:0"):
     repickle = False
     print(time.strftime('[%H:%M:%S]'), 'Checking for pickled data... ')
     ##############
-    def load_dir(fp):
+    def _load_dir(fp):
         """Load raw paths data into arrays and returns important info
         Args:
             fp : string path to data
@@ -103,6 +105,41 @@ with tf.device("/cpu:0"):
                                 text.append(tmp_res)
             print(time.strftime('[%H:%M:%S]'), 'Succesfully loaded data set of size',len(raw_audio))
             return raw_audio,text,len(raw_audio)
+    def load_dir(fp):
+        """Load raw paths data into arrays and returns important info
+        Args:
+            fp : string path to data
+        Returns:
+            Returns array of loaded files
+            loaded[0] = sound
+            loaded[1] = text
+            loaded[2] = dataset size
+        """
+        with tf.name_scope('raw_data'):
+            ind = 0
+            raw_audio = []
+            phonemes = []
+            words = []
+            text = []
+            for __file in glob.iglob(fp + '/*.*'):
+                    if not ("SA" in __file):
+                        ind+=1
+                        if (".wav" in __file):
+                            raw_audio.append(__file)
+                            __targ = __file[:-4]+str('.TXT')
+                            with open(__targ) as f:
+                                for line in f:
+                                    res = ''.join([i for i in line if not i.isdigit()])
+                            res = (list(res[2:-1].lower().translate(None, string.punctuation)))
+                            tmp_res = []
+                            for r in res:
+                                if r==' ':
+                                    tmp_res.append(0)
+                                else:
+                                    tmp_res.append(ord(r)-96)
+                            text.append(tmp_res)
+            print(time.strftime('[%H:%M:%S]'), 'Succesfully loaded data set of size',len(raw_audio))
+            return raw_audio,text,len(raw_audio)
     ##############
 
 
@@ -112,8 +149,8 @@ with tf.device("/cpu:0"):
 
     # Training Params #
     num_examples = dr[2]
-    num_epochs = 20
-    batchsize = 16
+    num_epochs = 200
+    batchsize = 32
     num_batches_per_epoch = int(num_examples/batchsize)
     ##############
 
@@ -150,7 +187,7 @@ with tf.device("/cpu:0"):
             tmp = next_Data(patharr[j],test)
             minibatch.append(np.array(tmp[0]))
         minibatch = np.array(minibatch)
-        saveImg(minibatch)
+        #saveImg(minibatch)
         return np.asarray(minibatch)
     def next_target_miniBatch(index,patharr):
         minibatch = []
@@ -170,7 +207,8 @@ with tf.device("/cpu:0"):
         Returns:
             featurearr: rank 2 tensor of maxsize * num_features
         """
-        z = path.replace('/','').split("LibriSpeech")[1][:-5]
+        #z = path.replace('/','').split("LibriSpeech")[1][:-5]
+        z = path.replace('/','').split("TIMIT")[1][:-4]
         if test or repickle or not os.path.exists(pickle_path+'/'+z+'.npy'):
             featurearr = []
             ftrtmp=features(path, num_mfccs)
@@ -192,18 +230,18 @@ with tf.device("/cpu:0"):
             Return a num x max_stepsize*32 feature vector
         """
         (rate,sample) = wav.read(rawsnd)
-        mfcc = feat.mfcc(sample,rate,winlen=0.025,winstep=0.01,numcep=num_mfccs,nfilt=26,preemph=0.97,appendEnergy=True)
-        derivative = np.zeros(mfcc.shape)
-        for i in range(1, mfcc.shape[0] - 1):
-            derivative[i, :] = mfcc[i + 1, :] - mfcc[i - 1, :]
-        mfcc_derivative = np.concatenate((mfcc, derivative), axis=1)
-        derivative2 = np.zeros(derivative.shape)
-        for i in range(1, derivative.shape[0] - 1):
-            derivative2[i, :] = derivative[i + 1, :] - derivative[i - 1, :]
-        out = np.concatenate((mfcc, derivative, derivative2), axis=1)
-        out -= (np.mean(out,axis=0) + 1e-8)
+        mfcc = feat.mfcc(sample,rate,winlen=0.025,winstep=0.01,numcep=num_mfccs,nfilt=26,preemph=0.95)
+        #derivative = np.zeros(mfcc.shape)
+        #for i in range(1, mfcc.shape[0] - 1):
+        #    derivative[i, :] = mfcc[i + 1, :] - mfcc[i - 1, :]
+        #mfcc_derivative = np.concatenate((mfcc, derivative), axis=1)
+        #derivative2 = np.zeros(derivative.shape)
+        #for i in range(1, derivative.shape[0] - 1):
+        #    derivative2[i, :] = derivative[i + 1, :] - derivative[i - 1, :]
+        #out = np.concatenate((mfcc, derivative, derivative2), axis=1)
+        mfcc -= (np.mean(mfcc,axis=0) + 1e-8)
         #print(out.shape)
-        return (out)
+        return (mfcc - np.max(mfcc))/-np.ptp(mfcc)
     def r_saveImg(arr):
         """Saves testing batch images to disk
         Args:
@@ -344,101 +382,32 @@ with tf.device("/gpu:0"):
     print(time.strftime('[%H:%M:%S]'), 'Loading network functions... ')
     graph = tf.Graph()
     with graph.as_default():
-        #tf.set_random_seed(0)
-        initializer = tf.contrib.layers.xavier_initializer()
-        training = tf.placeholder(tf.bool)
-        def lstm_cell(BiDirection=False):
-            i = 1+int(BiDirection)
-            if BatchNorm:
-                return BN_LSTMCell.BNLSTMCell(num_hidden*i,training=training)
-            if LayerNorm:
-                return tf.contrib.rnn.LayerNormBasicLSTMCell(num_hidden*i,forget_bias=1.0,activation=tf.tanh)
-            return tf.contrib.rnn.BasicLSTMCell(num_hidden*i, forget_bias=1.0, activation=tf.tanh)
-        #Network Code is heavily influenced by igormq's ctc_tensorflow example
-        with tf.name_scope('inputLength'):
-            seq_len = tf.placeholder(tf.int32, [None])
-
-        with tf.name_scope('input'):
-            inputs = tf.placeholder(tf.float32, [None, None, num_mfccs*3])
-            #inputs = tf.expand_dims(inputs, -1)
-            targets = tf.sparse_placeholder(tf.int32)
-            #tf.summary.histogram("input",inputs)
-            #tf.summary.histogram("targets",tf.sparse_to_dense(targets.indices,targets.dense_shape,targets.values))
-
-        # Stacking rnn cells
-        with tf.name_scope('cellStack'):
-            if BLSTM:
-                stack_fw = tf.contrib.rnn.MultiRNNCell([lstm_cell(BiDirection=True) for _ in range(num_layers)])
-                stack_bw = tf.contrib.rnn.MultiRNNCell([lstm_cell(BiDirection=True) for _ in range(num_layers)])
-            else:
-                stack = tf.contrib.rnn.MultiRNNCell([lstm_cell() for _ in range(num_layers)])
-
-        if BLSTM:
-            (outputs_fw, outputs_bw), last_state = tf.nn.bidirectional_dynamic_rnn(stack_fw,stack_bw, inputs, seq_len,dtype=tf.float32)
-            outputs = tf.concat(axis=2, values=[outputs_fw, outputs_bw])
-        else:
-            outputs, _ = tf.nn.dynamic_rnn(stack, inputs, seq_len, dtype=tf.float32)
+        inputs = tf.placeholder(tf.float32, [None, None, num_mfccs])
+        targets = tf.sparse_placeholder(tf.int32)
+        seq_len = tf.placeholder(tf.int32, [None])
+        def lstm_cell():
+            return tf.contrib.rnn.LSTMCell(num_hidden, state_is_tuple=True)
+        stack = tf.contrib.rnn.MultiRNNCell([lstm_cell() for _ in range(num_layers)], state_is_tuple=True)
+        outputs, _ = tf.nn.dynamic_rnn(stack, inputs, seq_len, dtype=tf.float32)
         shape = tf.shape(inputs)
-        batch_s, TF_max_timesteps = shape[0], shape[1]
-
-        # Reshaping to apply the same weights over the timesteps
-        with tf.name_scope('outputs'):
-            if BLSTM:
-                outputs = tf.reshape(outputs, [-1, num_hidden*2])
-            else:
-                outputs = tf.reshape(outputs, [-1, num_hidden])
-
-        #with tf.name_scope('weights'):
-        #    W = tf.Variable(initializer([num_hidden,num_classes]))
-        #    W = tf.Variable(tf.truncated_normal([num_hidden,num_classes],stddev=0.1))
-        #    W = tf.Variable(tf.random_normal([num_hidden, num_classes],stddev=0.3))
-        #    tf.summary.histogram('weightsHistogram', W)
-        with tf.name_scope('biases'):
-            b = tf.Variable(tf.constant(0., shape=[num_classes]))
-            #b = tf.Variable(initializer([num_classes]))
-            #tf.summary.histogram('biasesHistogram', b)
-
-        with tf.name_scope('logits'):
-            # Doing the affine projection
-            #logits = tf.matmul(outputs, W) + b
-            logits = FullyConnected('fc', outputs, num_classes, nl=tf.nn.relu,W_init=BN_LSTMCell.orthogonal_initializer())+b
-            # Reshaping back to the original shape
-            logits = tf.reshape(logits, [batch_s, -1, num_classes])
-            # Time major
-            logits = tf.transpose(logits, (1, 0, 2))
-            logits = tf.nn.softmax(logits)
-        with tf.name_scope('loss'):
-            x = tf.nn.ctc_loss(targets, logits, seq_len, ignore_longer_outputs_than_inputs=True)
-            #loss = tf.reduce_mean(tf.boolean_mask(x, tf.logical_not(tf.is_inf(x))))
-            loss = tf.reduce_mean(x)
-        with tf.name_scope('cost'):
-            cost = tf.reduce_mean(loss)
+        batch_s, max_timesteps = shape[0], shape[1]
+        outputs = tf.reshape(outputs, [-1, num_hidden])
+        W = tf.Variable(tf.truncated_normal([num_hidden,
+                                         num_classes],
+                                        stddev=0.1))
+        b = tf.Variable(tf.constant(0., shape=[num_classes]))
+        logits = tf.matmul(outputs, W) + b
+        logits = tf.reshape(logits, [batch_s, -1, num_classes])
+        logits = tf.transpose(logits, (1, 0, 2))
+        loss = tf.nn.ctc_loss(targets, logits, seq_len, ignore_longer_outputs_than_inputs=True)
+        cost = tf.reduce_mean(loss)
         tf.summary.scalar("cost", cost)
-        with tf.name_scope('optimizer'):
-            if opt_momentum:
-                optimizer = tf.train.MomentumOptimizer(learning_rate,momentum).minimize(cost)
-            if opt_adam:
-                optimizer = tf.train.AdamOptimizer(learning_rate,momentum)#.minimize(loss)
-            if opt_adag:
-                optimizer = tf.train.AdagradOptimizer(learning_rate)
-            if opt_sgd:
-                optimizer = tf.train.GradientDescentOptimizer(learning_rate)
-            gvs = optimizer.compute_gradients(cost)
-            def ClipIfNotNone(grad):
-                if grad is None:
-                    return grad
-                return tf.clip_by_value(grad, -1, 1)
-            capped_gvs = [(ClipIfNotNone(grad), var) for grad, var in gvs]
-            train_optimizer = optimizer.apply_gradients(capped_gvs)
-
-        with tf.name_scope('decoder'):
-            #decoded, log_prob = tf.nn.ctc_greedy_decoder(logits, seq_len)
-            decoded, log_prob = tf.nn.ctc_beam_search_decoder(logits, seq_len)
-
-        with tf.name_scope('LER'):
-            ler = tf.reduce_mean(tf.edit_distance(tf.cast(decoded[0], tf.int32),targets))
+        train_optimizer = tf.train.AdamOptimizer(learning_rate,
+                                           momentum).minimize(loss)
+        decoded, log_prob = tf.nn.ctc_greedy_decoder(logits, seq_len)
+        ler = tf.reduce_mean(tf.edit_distance(tf.cast(decoded[0], tf.int32),
+                                          targets))
         tf.summary.scalar("LER", ler)
-
         merged = tf.summary.merge_all()
 
 with tf.device("/cpu:0"):
@@ -482,8 +451,8 @@ with tf.device("/cpu:0"):
                 batch_train_targets = sparse_tuple_from(train_targets[newindex])
                 feed = {inputs: batch_train_inputs,
                         targets: batch_train_targets,
-                        seq_len: batch_train_seq_len,
-                        training: True
+                        seq_len: batch_train_seq_len
+                #        ,training: True
                         }
                 batch_cost, _, l = sess.run([cost, train_optimizer, ler], feed)
                 train_cost += batch_cost*batchsize
@@ -509,8 +478,8 @@ with tf.device("/cpu:0"):
             batch_test_targets = sparse_tuple_from(test_targets[newindex])
             t_feed = {inputs: batch_test_inputs,
                     targets: batch_test_targets,
-                    seq_len: batch_test_seq_len,
-                    training: False
+                    seq_len: batch_test_seq_len
+            #        ,training: False
                     }
             test_ler,d = sess.run((ler,decoded[0]), feed_dict=t_feed)
             dense_decoded = tf.sparse_tensor_to_dense(d, default_value=-1).eval(session=sess)
