@@ -40,7 +40,7 @@ with tf.device("/cpu:0"):
     # Network Params #
     num_mfccs = 13
     num_classes = 28
-    num_hidden = 128
+    num_hidden = 100
     learning_rate = 1e-4
     momentum = 0.9
     num_layers = 1
@@ -48,10 +48,10 @@ with tf.device("/cpu:0"):
     BLSTM = False
     batch_norm = True
     layer_norm = False
-    input_noise = True
+    input_noise = False
     noise_magnitude = 0.2
-    opt_momentum = False
-    opt_adam = True
+    opt_momentum = True
+    opt_adam = False
     opt_adag = False
     opt_sgd = False
 
@@ -137,7 +137,7 @@ with tf.device("/cpu:0"):
 
     # Training Params #
     num_examples = dr[2]
-    num_epochs = 500
+    num_epochs = 300
     batchsize = 16
     num_batches_per_epoch = int(num_examples/batchsize)
     ##############
@@ -229,18 +229,6 @@ with tf.device("/cpu:0"):
         ft -= (np.mean(ft,axis=0) + 1e-8)
         ft /= np.max(np.abs(ft),axis=0)
         return (ft)
-    def r_saveImg(arr):
-        """Saves testing batch images to disk
-        Args:
-            arr: array to save
-        Returns:
-            nothing
-        """
-        n=0
-        for i in arr:
-            im = scipy.misc.toimage(i)
-            im.save('r_img/'+str(n)+'.jpg')
-            n+=1
     def saveImg(arr):
         """Saves training images to disk
         Args:
@@ -345,24 +333,6 @@ with tf.device("/cpu:0"):
             else:
                 raise ValueError('Padding type "%s" not understood' % padding)
         return x, lengths
-    def fake_data(num_examples, num_features, num_labels, min_size = 10, max_size=100):
-        """Generates random noise as input (for debug purposes)
-        Args:
-            num_examples: number of instances of data
-            num_features: number of fake features to generate
-            num_labels: number of classes-1
-            min_size: minimum timestep length of fake data
-            max_size: max timestep length
-        Returns:
-            inputs: num_examples x num_features x max_size
-            labels: num_examples x max_size [from 0 -> num_labels]
-        """
-        np.random.seed(0)
-        timesteps = np.random.randint(min_size, max_size, (num_examples,))
-        inputs = np.asarray([np.random.randn(t, num_features).astype(np.float32) for t in timesteps])
-        #inputs = np.asarray([np.ones((t, num_features))*255 for t in timesteps])
-        labels = np.asarray([np.random.randint(0, num_labels, np.random.randint(1, inputs[i].shape[0], (1,))).astype(np.int64) for i, _ in enumerate(timesteps)])
-        return inputs,labels
     ####################
 
 with tf.device("/gpu:0"):
@@ -379,15 +349,13 @@ with tf.device("/gpu:0"):
             if layer_norm:
                 return tf.contrib.rnn.layer_normBasicLSTMCell(num_hidden*i,forget_bias=1.0,activation=tf.tanh)
             return tf.contrib.rnn.BasicLSTMCell(num_hidden*i, forget_bias=1.0, activation=tf.tanh,state_is_tuple=True)
-        #Network Code is heavily influenced by igormq's ctc_tensorflow example
         with tf.name_scope('inputLength'):
             seq_len = tf.placeholder(tf.int32, [None])
 
         with tf.name_scope('input'):
             inputs = tf.placeholder(tf.float32, [None, None, num_mfccs])
             targets = tf.sparse_placeholder(tf.int32)
-            #tf.summary.histogram("input",inputs)
-            #tf.summary.histogram("targets",tf.sparse_to_dense(targets.indices,targets.dense_shape,targets.values))
+            txt = tf.placeholder(tf.string)
 
         # Stacking rnn cells
         with tf.name_scope('cellStack'):
@@ -441,7 +409,6 @@ with tf.device("/gpu:0"):
             loss = tf.reduce_mean(x)
         with tf.name_scope('cost'):
             cost = tf.reduce_mean(loss)
-        tf.summary.scalar("cost", cost)
         with tf.name_scope('optimizer'):
             if opt_momentum:
                 optimizer = tf.train.MomentumOptimizer(learning_rate,momentum)#.minimize(cost)
@@ -465,9 +432,10 @@ with tf.device("/gpu:0"):
 
         with tf.name_scope('LER'):
             ler = tf.reduce_mean(tf.edit_distance(tf.cast(decoded[0], tf.int32),targets))
-        tf.summary.scalar("LER", ler)
-
-        merged = tf.summary.merge_all()
+        s_ler = tf.summary.scalar("LER", ler)
+        s_txt = tf.summary.text("inputs",txt)
+        s_cost = tf.summary.scalar("cost", cost)
+        merged = tf.summary.merge([s_ler,s_txt,s_cost])
 
 with tf.device("/cpu:0"):
     # Launch the graph
@@ -508,11 +476,12 @@ with tf.device("/cpu:0"):
                 batch_train_inputs, batch_train_seq_len = pad_sequences(batch_train_inputs)
                 # Converting to sparse representation so as to to feed SparseTensor input
                 batch_train_targets = sparse_tuple_from(train_targets[newindex])
-                saveImg(batch_train_inputs)
+                #saveImg(batch_train_inputs)
                 feed = {inputs: batch_train_inputs,
                         targets: batch_train_targets,
                         seq_len: batch_train_seq_len,
-                        training: True
+                        training: True,
+                        txt: str(decode_to_chars(train_targets[0]))
                         }
                 batch_cost, _, l = sess.run([cost, train_optimizer, ler], feed)
                 train_cost += batch_cost*batchsize
@@ -521,6 +490,7 @@ with tf.device("/cpu:0"):
                 t_time=time.time()
                 if (batch % 32 == 0):
                     summary = sess.run(merged, feed_dict=feed, options=run_options, run_metadata=run_metadata)
+                    train_writer.add_summary(summary, int(batch)+int(curr_epoch*num_batches_per_epoch))
                     train_writer.add_summary(summary, int(batch)+int(curr_epoch*num_batches_per_epoch))
                     train_writer.flush()
 
@@ -539,7 +509,8 @@ with tf.device("/cpu:0"):
             t_feed = {inputs: batch_test_inputs,
                     targets: batch_test_targets,
                     seq_len: batch_test_seq_len,
-                    training: False
+                    training: False,
+                    txt: str(decode_to_chars(train_targets[0]))
                     }
             test_ler,d = sess.run((ler,decoded[0]), feed_dict=t_feed)
             dense_decoded = tf.sparse_tensor_to_dense(d, default_value=-1).eval(session=sess)
