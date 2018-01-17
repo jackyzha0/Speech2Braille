@@ -46,12 +46,12 @@ with tf.device("/cpu:0"):
     num_layers = 1
     use_FC_Layer = False
     BLSTM = False
-    batch_norm = True
+    batch_norm = False#True
     layer_norm = False
-    input_noise = True
+    input_noise = False#True
     noise_magnitude = 0.2
-    opt_momentum = False
-    opt_adam = True
+    opt_momentum = True#False
+    opt_adam = False#True
     opt_adag = False
     opt_sgd = False
 
@@ -64,16 +64,16 @@ with tf.device("/cpu:0"):
     #SPACE_INDEX = 0
     #FIRST_INDEX = ord('a')-96-1  # 0 is reserved to space
     if dataset == 'TIMIT':
-        test_path = '/home/jacky/2kx/Spyre/__data/TIMIT/TEST/*/*'
-        path = '/home/jacky/2kx/Spyre/__data/TIMIT/TRAIN/*/*'
+        test_path = '/home/jacky/2kx/__data/TIMIT/TEST/*/*'
+        path = '/home/jacky/2kx/__data/TIMIT/TRAIN/*/*'
     if dataset == 'LibriSpeech':
-        test_path = '/home/jacky/2kx/Spyre/__data/LibriSpeech/test-clean/*/*'
-        path = '/home/jacky/2kx/Spyre/__data/LibriSpeech/train-clean-100/*/*'
+        test_path = '/home/jacky/2kx/__data/LibriSpeech/test-clean/*/*'
+        path = '/home/jacky/2kx/__data/LibriSpeech/train-clean-100/*/*'
 
     logImages = False
 
     # Pickle Settings #
-    pickle_path = 'timit_pickle'
+    pickle_path = 'pickle'
     repickle = False
     print(time.strftime('[%H:%M:%S]'), 'Checking for pickled data... ')
     ##############
@@ -138,7 +138,7 @@ with tf.device("/cpu:0"):
     # Training Params #
     num_examples = dr[2]
     num_epochs = 500
-    batchsize = 16
+    batchsize = 128
     num_batches_per_epoch = int(num_examples/batchsize)
     ##############
 

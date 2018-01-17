@@ -2,3 +2,4 @@
 totalsummary/*
 tfevents
 timit_pickle/*
+*.npy
