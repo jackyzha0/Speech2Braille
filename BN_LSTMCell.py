@@ -43,6 +43,7 @@ class LSTMCell(RNNCell):
 
             return new_h, (new_c, new_h)
 
+
 class BNLSTMCell(RNNCell):
     '''Batch normalized LSTM as described in arxiv.org/abs/1603.09025'''
     def __init__(self, num_units, training):

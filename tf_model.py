@@ -32,28 +32,35 @@ import BN_LSTMCell
 print('[OK] BLSTM Cell ')
 import scipy
 print('[OK] scipy ')
-#os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
+os.environ["CUDA_VISIBLE_DEVICES"] = '0'
 
-config=tf.ConfigProto(gpu_options=tf.GPUOptions(allow_growth=True))
+config=tf.ConfigProto()
+config.gpu_options.per_process_gpu_memory_fraction = 0.7 # maximun alloc gpu50% of MEM
+config.gpu_options.allow_growth = True #allocate dynamically
 
 with tf.device("/cpu:0"):
     # Network Params #
     num_mfccs = 13
     num_classes = 28
     num_hidden = 128
-    learning_rate = 1e-4
+    learning_rate = 1e-2
     momentum = 0.9
     num_layers = 1
-    use_FC_Layer = False
+    use_FC_Layer = True
     BLSTM = False
-    batch_norm = False#True
+    batch_norm = True
     layer_norm = False
-    input_noise = False#True
-    noise_magnitude = 0.2
-    opt_momentum = True#False
-    opt_adam = False#True
+    input_noise = False
+    noise_magnitude = 0.4
+    use_l2_loss = True
+    lambda_l2_reg = 0.1
+    opt_momentum = False
+    opt_adam = False
     opt_adag = False
+    opt_adad = False
     opt_sgd = False
+    opt_rmsprop = True
 
     dataset = 'TIMIT' #[TIMIT / LibriSpeech]
     ##############
@@ -137,7 +144,7 @@ with tf.device("/cpu:0"):
 
     # Training Params #
     num_examples = dr[2]
-    num_epochs = 500
+    num_epochs = 300
     batchsize = 128
     num_batches_per_epoch = int(num_examples/batchsize)
     ##############
@@ -204,13 +211,14 @@ with tf.device("/cpu:0"):
             featurearr = []
             ftrtmp=features(path, num_mfccs)
             featurearr.append(ftrtmp)
+            featurearr = np.array(featurearr)
             np.save(pickle_path+'/'+z,featurearr)
             print(time.strftime('[%H:%M:%S]'), 'Pickle saved to',pickle_path+'/'+z[:-4])
         else:
             featurearr = np.load(pickle_path+'/'+z+'.npy')
-            if input_noise:
-                featurearr += np.random.normal(scale=noise_magnitude,size=featurearr.shape)
         #print(path)
+        if input_noise:
+            featurearr += np.random.normal(scale=noise_magnitude,size=featurearr.shape)
         return featurearr
     def features(rawsnd, num) :
         """Compute num amount of audio features of a sound
@@ -365,13 +373,14 @@ with tf.device("/cpu:0"):
         return inputs,labels
     ####################
 
-with tf.device("/gpu:0"):
+with tf.device("/device:GPU:0"):
     print(time.strftime('[%H:%M:%S]'), 'Loading network functions... ')
     graph = tf.Graph()
     with graph.as_default():
         #tf.set_random_seed(0)
         initializer = tf.contrib.layers.xavier_initializer()
         training = tf.placeholder(tf.bool)
+        regularizer = tf.contrib.layers.l2_regularizer(scale=lambda_l2_reg)
         def lstm_cell(BiDirection=False):
             i = 1+int(BiDirection)
             if batch_norm:
@@ -414,23 +423,22 @@ with tf.device("/gpu:0"):
 
         with tf.name_scope('weights'):
             if BLSTM:
-                W = tf.Variable(initializer([num_hidden*2,num_classes]))
+                W = tf.get_variable("W", regularizer=regularizer,initializer=initializer([num_hidden*2,num_classes]))
             else:
-                W = tf.Variable(initializer([num_hidden,num_classes]))
+                W = tf.get_variable("W", regularizer=regularizer,initializer=initializer([num_hidden,num_classes]))
         #    W = tf.Variable(tf.truncated_normal([num_hidden,num_classes],stddev=0.1))
         #    W = tf.Variable(tf.random_normal([num_hidden, num_classes],stddev=0.3))
         #    tf.summary.histogram('weightsHistogram', W)
         with tf.name_scope('biases'):
-            b = tf.Variable(tf.constant(0.1, shape=[num_classes]))
+            b = tf.get_variable("b", initializer=tf.constant(0.1, shape=[num_classes]))
             #b = tf.Variable(initializer([num_classes]))
             #tf.summary.histogram('biasesHistogram', b)
 
         with tf.name_scope('logits'):
             # Doing the affine projection
             if use_FC_Layer:
-                logits = FullyConnected('fc', outputs, num_classes, nl=tf.nn.relu,W_init=initializer)+b
-            else:
-                logits = tf.matmul(outputs, W) + b
+                W = FullyConnected('fc', W, num_classes, nl=tf.nn.relu, W_init=initializer)
+            logits = tf.matmul(outputs, W) + b
             # Reshaping back to the original shape
             logits = tf.reshape(logits, [batch_s, -1, num_classes])
             # Time major
@@ -449,8 +457,12 @@ with tf.device("/gpu:0"):
                 optimizer = tf.train.AdamOptimizer(learning_rate,momentum)#.minimize(loss)
             if opt_adag:
                 optimizer = tf.train.AdagradOptimizer(learning_rate)
+            if opt_adad:
+                optimizer = tf.train.AdadeltaOptimizer(learning_rate)
             if opt_sgd:
                 optimizer = tf.train.GradientDescentOptimizer(learning_rate)
+            if opt_rmsprop:
+                optimizer = tf.train.RMSPropOptimizer(learning_rate,momentum)
             gvs = optimizer.compute_gradients(cost)
             def ClipIfNotNone(grad):
                 if grad is None:
@@ -460,8 +472,8 @@ with tf.device("/gpu:0"):
             train_optimizer = optimizer.apply_gradients(capped_gvs)
 
         with tf.name_scope('decoder'):
-            #decoded, log_prob = tf.nn.ctc_greedy_decoder(logits, seq_len)
-            decoded, log_prob = tf.nn.ctc_beam_search_decoder(logits, seq_len)
+            decoded, log_prob = tf.nn.ctc_greedy_decoder(logits, seq_len)
+            #decoded, log_prob = tf.nn.ctc_beam_search_decoder(logits, seq_len)
 
         with tf.name_scope('LER'):
             ler = tf.reduce_mean(tf.edit_distance(tf.cast(decoded[0], tf.int32),targets))
@@ -479,7 +491,7 @@ with tf.device("/cpu:0"):
         tf.global_variables_initializer().run()
 
         saver = tf.train.Saver()
-        run_options = tf.RunOptions(trace_level=tf.RunOptions.FULL_TRACE)
+        run_options = tf.RunOptions(trace_level=tf.RunOptions.FULL_TRACE,output_partition_graphs=True)
         run_metadata = tf.RunMetadata()
 
         if RESTOREMODEL == True:
@@ -514,14 +526,15 @@ with tf.device("/cpu:0"):
                         seq_len: batch_train_seq_len,
                         training: True
                         }
-                batch_cost, _, l = sess.run([cost, train_optimizer, ler], feed)
+                batch_cost, _, l = sess.run([cost, train_optimizer, ler], feed, options=run_options)#,run_metadata = run_metadata)
                 train_cost += batch_cost*batchsize
                 train_ler += l*batchsize
                 print('['+str(curr_epoch)+']','  >>>',time.strftime('[%H:%M:%S]'), 'Batch',batch+1,'/',num_batches_per_epoch,'@Cost',batch_cost,'Time Elapsed',time.time()-t_time,'s')
                 t_time=time.time()
-                if (batch % 32 == 0):
-                    summary = sess.run(merged, feed_dict=feed, options=run_options, run_metadata=run_metadata)
-                    train_writer.add_summary(summary, int(batch)+int(curr_epoch*num_batches_per_epoch))
+                if (batch % 16 == 0):
+                    summary = sess.run(merged, feed_dict=feed, options=run_options)#,run_metadata=run_metadata)
+                    train_writer.add_summary(summary, int(batch+(curr_epoch*num_batches_per_epoch)))
+                    #train_writer.add_run_metadata(run_metadata, 'step%03d' % int(batch+(curr_epoch*num_batches_per_epoch)))
                     train_writer.flush()
 
             # Metrics mean
@@ -541,7 +554,7 @@ with tf.device("/cpu:0"):
                     seq_len: batch_test_seq_len,
                     training: False
                     }
-            test_ler,d = sess.run((ler,decoded[0]), feed_dict=t_feed)
+            test_ler,d = sess.run((ler,decoded[0]), feed_dict=t_feed, options=run_options)#,run_metadata = run_metadata)
             dense_decoded = tf.sparse_tensor_to_dense(d, default_value=-1).eval(session=sess)
             for i, seq in enumerate(dense_decoded):
                 seq = [s for s in seq if s != -1]
@@ -553,9 +566,9 @@ with tf.device("/cpu:0"):
                 print('Done!')
             log = "Epoch {}/{}  |  Batch Cost : {:.3f}  |  Train Accuracy : {:.3f}%  |  Test Accuracy : {:.3f}%  |  Time Elapsed : {:.3f}s"
             print(log.format(curr_epoch+1, num_epochs, train_cost, 100-(train_ler*100), 100-(test_ler*100), time.time() - start))
-            t_summary = sess.run(merged, feed_dict=t_feed, options=run_options, run_metadata=run_metadata)
-            test_writer.add_summary(t_summary, int(batch)+int(curr_epoch*num_batches_per_epoch))
-            test_writer.add_run_metadata(run_metadata, 'step%03d' % int(batch+(curr_epoch*num_batches_per_epoch)))
+            t_summary = sess.run(merged, feed_dict=t_feed, options=run_options)#, run_metadata=run_metadata)
+            test_writer.add_summary(t_summary, int(batch+(curr_epoch*num_batches_per_epoch)))
+            #test_writer.add_run_metadata(run_metadata, 'step%03d' % int(batch+(curr_epoch*num_batches_per_epoch)))
             test_writer.flush()
             save_path = saver.save(sess, savepath+'/model.ckpt')
             print(">>> Model saved succesfully")
