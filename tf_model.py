@@ -43,18 +43,18 @@ with tf.device("/cpu:0"):
     # Network Params #
     num_mfccs = 13
     num_classes = 28
-    num_hidden = 128
+    num_hidden = 100
     learning_rate = 1e-2
-    momentum = 0.9
+    momentum = 0.1
+    decay = 0.9
     num_layers = 1
-    use_FC_Layer = True
+    use_FC_Layer = False
     BLSTM = False
     batch_norm = True
     layer_norm = False
-    input_noise = False
-    noise_magnitude = 0.4
-    use_l2_loss = True
-    lambda_l2_reg = 0.1
+    input_noise = True
+    noise_magnitude = 0.1
+    lambda_l2_reg = 0.00
     opt_momentum = False
     opt_adam = False
     opt_adag = False
@@ -144,7 +144,7 @@ with tf.device("/cpu:0"):
 
     # Training Params #
     num_examples = dr[2]
-    num_epochs = 300
+    num_epochs = 2400
     batchsize = 128
     num_batches_per_epoch = int(num_examples/batchsize)
     ##############
@@ -158,7 +158,7 @@ with tf.device("/cpu:0"):
     print(time.strftime('[%H:%M:%S]'), 'Parsing testing directory... ')
     t_dr = load_dir(test_path)
     testsetsize = len(t_dr[0])
-    testbatchsize = 32
+    testbatchsize = 64
 
     # Functions #
     def decode_to_chars(test_targets):
@@ -207,7 +207,7 @@ with tf.device("/cpu:0"):
             y = -4
         z = path.replace('/','').split(dataset)[1][:y]
         #print(pickle_path+'/'+z+'.npy')
-        if test or repickle or not os.path.exists(pickle_path+'/'+z+'.npy'):
+        if repickle or not os.path.exists(pickle_path+'/'+z+'.npy'):
             featurearr = []
             ftrtmp=features(path, num_mfccs)
             featurearr.append(ftrtmp)
@@ -217,8 +217,6 @@ with tf.device("/cpu:0"):
         else:
             featurearr = np.load(pickle_path+'/'+z+'.npy')
         #print(path)
-        if input_noise:
-            featurearr += np.random.normal(scale=noise_magnitude,size=featurearr.shape)
         return featurearr
     def features(rawsnd, num) :
         """Compute num amount of audio features of a sound
@@ -230,12 +228,14 @@ with tf.device("/cpu:0"):
         """
         x, sample_rate = librosa.load(rawsnd)
         #s_tft = np.abs(librosa.stft(x))
-        ft = lib_feat.mfcc(y=x, sr=sample_rate, n_mfcc=num).T
-        #t_ft = ft
-        #ft = np.delete(np.append(ft,lib_feat.delta(t_ft),axis=1),0,1)
-        #ft = np.delete(np.append(ft,lib_feat.delta(t_ft,order=2),axis=1),0,1)
-        ft -= (np.mean(ft,axis=0) + 1e-8)
+        ft = lib_feat.mfcc(y=x, sr=sample_rate, n_mfcc=num+1).T
+        ft = np.delete(ft,0,1)
+        #ft = lib_feat.melspectrogram(y=x, sr=sample_rate, n_fft=1024, hop_length=256, power=1.0).T
+        t_ft = ft
+        ft = np.append(ft,lib_feat.delta(t_ft),axis=1)
+        ft = np.append(ft,lib_feat.delta(t_ft,order=2),axis=1)
         ft /= np.max(np.abs(ft),axis=0)
+        ft -= 1
         return (ft)
     def r_saveImg(arr):
         """Saves testing batch images to disk
@@ -352,6 +352,8 @@ with tf.device("/cpu:0"):
                 x[idx, -len(trunc):] = trunc
             else:
                 raise ValueError('Padding type "%s" not understood' % padding)
+        if input_noise:
+            x += np.random.normal(scale=noise_magnitude,size=x.shape)
         return x, lengths
     def fake_data(num_examples, num_features, num_labels, min_size = 10, max_size=100):
         """Generates random noise as input (for debug purposes)
@@ -393,7 +395,7 @@ with tf.device("/device:GPU:0"):
             seq_len = tf.placeholder(tf.int32, [None])
 
         with tf.name_scope('input'):
-            inputs = tf.placeholder(tf.float32, [None, None, num_mfccs])
+            inputs = tf.placeholder(tf.float32, [None, None, num_mfccs*3])
             targets = tf.sparse_placeholder(tf.int32)
             #tf.summary.histogram("input",inputs)
             #tf.summary.histogram("targets",tf.sparse_to_dense(targets.indices,targets.dense_shape,targets.values))
@@ -430,7 +432,7 @@ with tf.device("/device:GPU:0"):
         #    W = tf.Variable(tf.random_normal([num_hidden, num_classes],stddev=0.3))
         #    tf.summary.histogram('weightsHistogram', W)
         with tf.name_scope('biases'):
-            b = tf.get_variable("b", initializer=tf.constant(0.1, shape=[num_classes]))
+            b = tf.get_variable("b", initializer=tf.constant(0., shape=[num_classes]))
             #b = tf.Variable(initializer([num_classes]))
             #tf.summary.histogram('biasesHistogram', b)
 
@@ -444,9 +446,9 @@ with tf.device("/device:GPU:0"):
             # Time major
             logits = tf.transpose(logits, (1, 0, 2))
         with tf.name_scope('loss'):
-            x = tf.nn.ctc_loss(targets, logits, seq_len, ignore_longer_outputs_than_inputs=True)
+            loss = tf.nn.ctc_loss(targets, logits, seq_len, ignore_longer_outputs_than_inputs=True)
             #loss = tf.reduce_mean(tf.boolean_mask(x, tf.logical_not(tf.is_inf(x))))
-            loss = tf.reduce_mean(x)
+            #loss = tf.reduce_mean(x)
         with tf.name_scope('cost'):
             cost = tf.reduce_mean(loss)
         tf.summary.scalar("cost", cost)
@@ -462,7 +464,7 @@ with tf.device("/device:GPU:0"):
             if opt_sgd:
                 optimizer = tf.train.GradientDescentOptimizer(learning_rate)
             if opt_rmsprop:
-                optimizer = tf.train.RMSPropOptimizer(learning_rate,momentum)
+                optimizer = tf.train.RMSPropOptimizer(learning_rate,decay=decay,momentum=momentum,centered=True)
             gvs = optimizer.compute_gradients(cost)
             def ClipIfNotNone(grad):
                 if grad is None:
@@ -520,7 +522,7 @@ with tf.device("/cpu:0"):
                 batch_train_inputs, batch_train_seq_len = pad_sequences(batch_train_inputs)
                 # Converting to sparse representation so as to to feed SparseTensor input
                 batch_train_targets = sparse_tuple_from(train_targets[newindex])
-                saveImg(batch_train_inputs)
+                #saveImg(batch_train_inputs)
                 feed = {inputs: batch_train_inputs,
                         targets: batch_train_targets,
                         seq_len: batch_train_seq_len,
