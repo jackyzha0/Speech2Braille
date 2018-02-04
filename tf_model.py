@@ -43,17 +43,17 @@ with tf.device("/cpu:0"):
     # Network Params #
     num_mfccs = 13
     num_classes = 28
-    num_hidden = 100
-    learning_rate = 1e-2
-    momentum = 0.1
+    num_hidden = 256
+    learning_rate = 1e-4
+    momentum = 0.9
     decay = 0.9
-    num_layers = 1
+    num_layers = 2
     use_FC_Layer = False
     BLSTM = False
-    batch_norm = True
+    batch_norm = False
     layer_norm = False
     input_noise = True
-    noise_magnitude = 0.1
+    noise_magnitude = 0.0
     lambda_l2_reg = 0.00
     opt_momentum = False
     opt_adam = False
@@ -145,14 +145,13 @@ with tf.device("/cpu:0"):
     # Training Params #
     num_examples = dr[2]
     num_epochs = 2400
-    batchsize = 128
+    batchsize = 16
     num_batches_per_epoch = int(num_examples/batchsize)
     ##############
 
     # Log Params #
     logs_path = 'totalsummary/logs/'+datetime.datetime.fromtimestamp(time.time()).strftime('%H:%M:%S')+'_'+str(batchsize)+'_'+str(num_epochs)
     savepath = 'totalsummary/ckpt'
-    RESTOREMODEL = False
     ##############
 
     print(time.strftime('[%H:%M:%S]'), 'Parsing testing directory... ')
@@ -226,16 +225,15 @@ with tf.device("/cpu:0"):
         Returns:
             Return a num x max_stepsize*32 feature vector
         """
-        x, sample_rate = librosa.load(rawsnd)
+        x, sample_rate = librosa.load(rawsnd, sr=16000)
         #s_tft = np.abs(librosa.stft(x))
-        ft = lib_feat.mfcc(y=x, sr=sample_rate, n_mfcc=num+1).T
-        ft = np.delete(ft,0,1)
+        ft = lib_feat.mfcc(y=x, sr=sample_rate, n_mfcc=num, n_fft=int(sample_rate*0.025), hop_length=int(sample_rate*0.010)).T
         #ft = lib_feat.melspectrogram(y=x, sr=sample_rate, n_fft=1024, hop_length=256, power=1.0).T
         t_ft = ft
         ft = np.append(ft,lib_feat.delta(t_ft),axis=1)
         ft = np.append(ft,lib_feat.delta(t_ft,order=2),axis=1)
         ft /= np.max(np.abs(ft),axis=0)
-        ft -= 1
+        #ft -= 128
         return (ft)
     def r_saveImg(arr):
         """Saves testing batch images to disk
@@ -293,7 +291,7 @@ with tf.device("/cpu:0"):
         # convert that to 2D list (list of lists of integers)
         data = [data[offset:offset+WIDTH] for offset in range(0, WIDTH*HEIGHT, WIDTH)]
         return np.expand_dims(data, axis=4)
-    def pad_sequences(sequences, maxlen=None, dtype=np.float32,
+    def pad_sequences(sequences, maxlen=None, test=False,dtype=np.float32,
                       padding='post', truncating='post', value=-1.):
         '''
         Author: github.com/igormq
@@ -352,7 +350,7 @@ with tf.device("/cpu:0"):
                 x[idx, -len(trunc):] = trunc
             else:
                 raise ValueError('Padding type "%s" not understood' % padding)
-        if input_noise:
+        if input_noise and not test:
             x += np.random.normal(scale=noise_magnitude,size=x.shape)
         return x, lengths
     def fake_data(num_examples, num_features, num_labels, min_size = 10, max_size=100):
@@ -387,6 +385,7 @@ with tf.device("/device:GPU:0"):
             i = 1+int(BiDirection)
             if batch_norm:
                 return BN_LSTMCell.BNLSTMCell(num_hidden*i,training=training)
+                #return BN_LSTMCell.LSTMCell(num_hidden*i)
             if layer_norm:
                 return tf.contrib.rnn.layer_normBasicLSTMCell(num_hidden*i,forget_bias=1.0,activation=tf.tanh)
             return tf.contrib.rnn.BasicLSTMCell(num_hidden*i, forget_bias=1.0, activation=tf.tanh,state_is_tuple=True)
@@ -444,7 +443,7 @@ with tf.device("/device:GPU:0"):
             # Reshaping back to the original shape
             logits = tf.reshape(logits, [batch_s, -1, num_classes])
             # Time major
-            logits = tf.transpose(logits, (1, 0, 2))
+            logits = tf.transpose(logits, (1, 0, 2), name="out/logits")
         with tf.name_scope('loss'):
             loss = tf.nn.ctc_loss(targets, logits, seq_len, ignore_longer_outputs_than_inputs=True)
             #loss = tf.reduce_mean(tf.boolean_mask(x, tf.logical_not(tf.is_inf(x))))
@@ -490,18 +489,11 @@ with tf.device("/cpu:0"):
         initstart = time.time()
         train_writer = tf.summary.FileWriter(logs_path+'/TRAIN', graph=sess.graph)
         test_writer = tf.summary.FileWriter(logs_path+'/TEST', graph=sess.graph)
-        tf.global_variables_initializer().run()
 
-        saver = tf.train.Saver()
         run_options = tf.RunOptions(trace_level=tf.RunOptions.FULL_TRACE,output_partition_graphs=True)
         run_metadata = tf.RunMetadata()
-
-        if RESTOREMODEL == True:
-            if os.path.exists(savepath):
-                saver.restore(sess, savepath+'/model.ckpt')
-                print('>>>',time.strftime('[%H:%M:%S]'),'Model Restored Succesfully')
-            else:
-                print('>>>',time.strftime('[%H:%M:%S]'),'Model Restore Failed! Make sure the chkpt file exists')
+        tf.global_variables_initializer().run()
+        saver = tf.train.Saver()
         #Load paths
         for curr_epoch in range(num_epochs):
             print('>>>',time.strftime('[%H:%M:%S]'), 'Epoch',curr_epoch+1,'/',num_epochs)
@@ -522,7 +514,7 @@ with tf.device("/cpu:0"):
                 batch_train_inputs, batch_train_seq_len = pad_sequences(batch_train_inputs)
                 # Converting to sparse representation so as to to feed SparseTensor input
                 batch_train_targets = sparse_tuple_from(train_targets[newindex])
-                #saveImg(batch_train_inputs)
+                saveImg(batch_train_inputs)
                 feed = {inputs: batch_train_inputs,
                         targets: batch_train_targets,
                         seq_len: batch_train_seq_len,
@@ -549,7 +541,7 @@ with tf.device("/cpu:0"):
             test_targets = next_target_miniBatch(t_index,t_dr[1])
             newindex = [i % testbatchsize for i in range(testbatchsize)]
             batch_test_inputs = test_inputs[newindex]
-            batch_test_inputs, batch_test_seq_len = pad_sequences(batch_test_inputs)
+            batch_test_inputs, batch_test_seq_len = pad_sequences(batch_test_inputs,test=True)
             batch_test_targets = sparse_tuple_from(test_targets[newindex])
             t_feed = {inputs: batch_test_inputs,
                     targets: batch_test_targets,
@@ -565,6 +557,7 @@ with tf.device("/cpu:0"):
                 print('Sequence %d' % i)
                 print('\t Original:\n%s' % tmp_o)
                 print('\t Decoded:\n%s' % tmp_d)
+                #print('\t Corrected:\n%s' % tmp_corr)
                 print('Done!')
             log = "Epoch {}/{}  |  Batch Cost : {:.3f}  |  Train Accuracy : {:.3f}%  |  Test Accuracy : {:.3f}%  |  Time Elapsed : {:.3f}s"
             print(log.format(curr_epoch+1, num_epochs, train_cost, 100-(train_ler*100), 100-(test_ler*100), time.time() - start))
@@ -572,6 +565,6 @@ with tf.device("/cpu:0"):
             test_writer.add_summary(t_summary, int(batch+(curr_epoch*num_batches_per_epoch)))
             #test_writer.add_run_metadata(run_metadata, 'step%03d' % int(batch+(curr_epoch*num_batches_per_epoch)))
             test_writer.flush()
-            save_path = saver.save(sess, savepath+'/model.ckpt')
+            save_path = saver.save(sess, savepath+'/model')
             print(">>> Model saved succesfully")
         print('Total Training Time: '+str(time.time() - initstart)+'s')
