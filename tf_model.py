@@ -10,7 +10,7 @@ print(time.strftime('[%H:%M:%S]'), 'Starting network... ')
 import sugartensor as tf
 print('[OK] tensorflow ')
 import datetime
-import sys
+import sys,argparse
 print('[OK] sys ')
 import random
 print('[OK] random ')
@@ -50,7 +50,7 @@ with tf.device("/cpu:0"):
     num_layers = 2
     use_FC_Layer = False
     BLSTM = False
-    batch_norm = False
+    batch_norm = True
     layer_norm = False
     input_noise = True
     noise_magnitude = 0.0
@@ -145,7 +145,7 @@ with tf.device("/cpu:0"):
     # Training Params #
     num_examples = dr[2]
     num_epochs = 2400
-    batchsize = 16
+    batchsize = 128
     num_batches_per_epoch = int(num_examples/batchsize)
     ##############
 
@@ -383,12 +383,13 @@ with tf.device("/device:GPU:0"):
         regularizer = tf.contrib.layers.l2_regularizer(scale=lambda_l2_reg)
         def lstm_cell(BiDirection=False):
             i = 1+int(BiDirection)
-            if batch_norm:
-                return BN_LSTMCell.BNLSTMCell(num_hidden*i,training=training)
-                #return BN_LSTMCell.LSTMCell(num_hidden*i)
-            if layer_norm:
-                return tf.contrib.rnn.layer_normBasicLSTMCell(num_hidden*i,forget_bias=1.0,activation=tf.tanh)
-            return tf.contrib.rnn.BasicLSTMCell(num_hidden*i, forget_bias=1.0, activation=tf.tanh,state_is_tuple=True)
+            with tf.name_scope('cell'):
+                if batch_norm:
+                    return BN_LSTMCell.BNLSTMCell(num_hidden*i,training=training)
+                    #return BN_LSTMCell.LSTMCell(num_hidden*i)
+                if layer_norm:
+                    return tf.contrib.rnn.layer_normBasicLSTMCell(num_hidden*i,forget_bias=1.0,activation=tf.tanh)
+                return tf.contrib.rnn.BasicLSTMCell(num_hidden*i, forget_bias=1.0, activation=tf.tanh,state_is_tuple=True)
         #Network Code is heavily influenced by igormq's ctc_tensorflow example
         with tf.name_scope('inputLength'):
             seq_len = tf.placeholder(tf.int32, [None])
@@ -482,89 +483,108 @@ with tf.device("/device:GPU:0"):
 
         merged = tf.summary.merge_all()
 
-with tf.device("/cpu:0"):
-    # Launch the graph
-    with tf.Session(graph=graph, config=config) as sess:
-        print("Starting Tensorboard...")
-        initstart = time.time()
-        train_writer = tf.summary.FileWriter(logs_path+'/TRAIN', graph=sess.graph)
-        test_writer = tf.summary.FileWriter(logs_path+'/TEST', graph=sess.graph)
+def train_loop():
+    with tf.device("/cpu:0"):
+        # Launch the graph
+        with tf.Session(graph=graph, config=config) as sess:
+            print("Starting Tensorboard...")
+            initstart = time.time()
+            train_writer = tf.summary.FileWriter(logs_path+'/TRAIN', graph=sess.graph)
+            test_writer = tf.summary.FileWriter(logs_path+'/TEST', graph=sess.graph)
 
-        run_options = tf.RunOptions(trace_level=tf.RunOptions.FULL_TRACE,output_partition_graphs=True)
-        run_metadata = tf.RunMetadata()
-        tf.global_variables_initializer().run()
-        saver = tf.train.Saver()
-        #Load paths
-        for curr_epoch in range(num_epochs):
-            print('>>>',time.strftime('[%H:%M:%S]'), 'Epoch',curr_epoch+1,'/',num_epochs)
-            train_cost = train_ler = 0
-            start = t_time = time.time()
-            index_list = range(0,datasetsize)
-            for batch in range(num_batches_per_epoch):
-                # Getting the index
-                indexes = random.sample(index_list,batchsize)
-                index_list = [x for x in index_list if x not in indexes]
-                train_inputs = next_miniBatch(indexes,dr[0])
-                train_targets = next_target_miniBatch(indexes,dr[1])
-                #train_inputs,train_targets = fake_data(num_examples,num_mfccs,num_classes-1)
-                newindex = [i % num_examples for i in range(batchsize)]
-                random.shuffle(newindex)
-                batch_train_inputs = train_inputs[newindex]
-                # Padding input to max_time_step of this batch
-                batch_train_inputs, batch_train_seq_len = pad_sequences(batch_train_inputs)
-                # Converting to sparse representation so as to to feed SparseTensor input
-                batch_train_targets = sparse_tuple_from(train_targets[newindex])
-                saveImg(batch_train_inputs)
-                feed = {inputs: batch_train_inputs,
-                        targets: batch_train_targets,
-                        seq_len: batch_train_seq_len,
-                        training: True
+            run_options = tf.RunOptions(trace_level=tf.RunOptions.FULL_TRACE,output_partition_graphs=True)
+            run_metadata = tf.RunMetadata()
+            tf.global_variables_initializer().run()
+            saver = tf.train.Saver()
+            #Load paths
+            for curr_epoch in range(num_epochs):
+                print('>>>',time.strftime('[%H:%M:%S]'), 'Epoch',curr_epoch+1,'/',num_epochs)
+                train_cost = train_ler = 0
+                start = t_time = time.time()
+                index_list = range(0,datasetsize)
+                for batch in range(num_batches_per_epoch):
+                    # Getting the index
+                    indexes = random.sample(index_list,batchsize)
+                    index_list = [x for x in index_list if x not in indexes]
+                    train_inputs = next_miniBatch(indexes,dr[0])
+                    train_targets = next_target_miniBatch(indexes,dr[1])
+                    #train_inputs,train_targets = fake_data(num_examples,num_mfccs,num_classes-1)
+                    newindex = [i % num_examples for i in range(batchsize)]
+                    random.shuffle(newindex)
+                    batch_train_inputs = train_inputs[newindex]
+                    # Padding input to max_time_step of this batch
+                    batch_train_inputs, batch_train_seq_len = pad_sequences(batch_train_inputs)
+                    # Converting to sparse representation so as to to feed SparseTensor input
+                    batch_train_targets = sparse_tuple_from(train_targets[newindex])
+                    #saveImg(batch_train_inputs)
+                    feed = {inputs: batch_train_inputs,
+                            targets: batch_train_targets,
+                            seq_len: batch_train_seq_len,
+                            training: True
+                            }
+                    batch_cost, _, l = sess.run([cost, train_optimizer, ler], feed, options=run_options)#,run_metadata = run_metadata)
+                    train_cost += batch_cost*batchsize
+                    train_ler += l*batchsize
+                    print('['+str(curr_epoch)+']','  >>>',time.strftime('[%H:%M:%S]'), 'Batch',batch+1,'/',num_batches_per_epoch,'@Cost',batch_cost,'Time Elapsed',time.time()-t_time,'s')
+                    t_time=time.time()
+                    if (batch % 16 == 0):
+                        summary = sess.run(merged, feed_dict=feed, options=run_options)#,run_metadata=run_metadata)
+                        train_writer.add_summary(summary, int(batch+(curr_epoch*num_batches_per_epoch)))
+                        #train_writer.add_run_metadata(run_metadata, 'step%03d' % int(batch+(curr_epoch*num_batches_per_epoch)))
+                        train_writer.flush()
+
+                # Metrics mean
+                train_cost /= num_examples
+                train_ler /= num_examples
+                #Testing
+                print('>>>',time.strftime('[%H:%M:%S]'), 'Evaluating Test Accuracy...')
+                t_index = random.sample(range(0, testsetsize), testbatchsize)
+                test_inputs = next_miniBatch(t_index,t_dr[0],test=True)
+                test_targets = next_target_miniBatch(t_index,t_dr[1])
+                newindex = [i % testbatchsize for i in range(testbatchsize)]
+                batch_test_inputs = test_inputs[newindex]
+                batch_test_inputs, batch_test_seq_len = pad_sequences(batch_test_inputs,test=True)
+                batch_test_targets = sparse_tuple_from(test_targets[newindex])
+                t_feed = {inputs: batch_test_inputs,
+                        targets: batch_test_targets,
+                        seq_len: batch_test_seq_len,
+                        training: False
                         }
-                batch_cost, _, l = sess.run([cost, train_optimizer, ler], feed, options=run_options)#,run_metadata = run_metadata)
-                train_cost += batch_cost*batchsize
-                train_ler += l*batchsize
-                print('['+str(curr_epoch)+']','  >>>',time.strftime('[%H:%M:%S]'), 'Batch',batch+1,'/',num_batches_per_epoch,'@Cost',batch_cost,'Time Elapsed',time.time()-t_time,'s')
-                t_time=time.time()
-                if (batch % 16 == 0):
-                    summary = sess.run(merged, feed_dict=feed, options=run_options)#,run_metadata=run_metadata)
-                    train_writer.add_summary(summary, int(batch+(curr_epoch*num_batches_per_epoch)))
-                    #train_writer.add_run_metadata(run_metadata, 'step%03d' % int(batch+(curr_epoch*num_batches_per_epoch)))
-                    train_writer.flush()
+                test_ler,d = sess.run((ler,decoded[0]), feed_dict=t_feed, options=run_options)#,run_metadata = run_metadata)
+                dense_decoded = tf.sparse_tensor_to_dense(d, default_value=-1).eval(session=sess)
+                for i, seq in enumerate(dense_decoded):
+                    seq = [s for s in seq if s != -1]
+                    tmp_o = decode_to_chars(test_targets[i])
+                    tmp_d = decode_to_chars(seq)
+                    print('Sequence %d' % i)
+                    print('\t Original:\n%s' % tmp_o)
+                    print('\t Decoded:\n%s' % tmp_d)
+                    #print('\t Corrected:\n%s' % tmp_corr)
+                    print('Done!')
+                log = "Epoch {}/{}  |  Batch Cost : {:.3f}  |  Train Accuracy : {:.3f}%  |  Test Accuracy : {:.3f}%  |  Time Elapsed : {:.3f}s"
+                print(log.format(curr_epoch+1, num_epochs, train_cost, 100-(train_ler*100), 100-(test_ler*100), time.time() - start))
+                t_summary = sess.run(merged, feed_dict=t_feed, options=run_options)#, run_metadata=run_metadata)
+                test_writer.add_summary(t_summary, int(batch+(curr_epoch*num_batches_per_epoch)))
+                #test_writer.add_run_metadata(run_metadata, 'step%03d' % int(batch+(curr_epoch*num_batches_per_epoch)))
+                test_writer.flush()
+                save_path = saver.save(sess, savepath+'/model')
+                print(">>> Model saved succesfully")
+            print('Total Training Time: '+str(time.time() - initstart)+'s')
 
-            # Metrics mean
-            train_cost /= num_examples
-            train_ler /= num_examples
-            #Testing
-            print('>>>',time.strftime('[%H:%M:%S]'), 'Evaluating Test Accuracy...')
-            t_index = random.sample(range(0, testsetsize), testbatchsize)
-            test_inputs = next_miniBatch(t_index,t_dr[0],test=True)
-            test_targets = next_target_miniBatch(t_index,t_dr[1])
-            newindex = [i % testbatchsize for i in range(testbatchsize)]
-            batch_test_inputs = test_inputs[newindex]
-            batch_test_inputs, batch_test_seq_len = pad_sequences(batch_test_inputs,test=True)
-            batch_test_targets = sparse_tuple_from(test_targets[newindex])
-            t_feed = {inputs: batch_test_inputs,
-                    targets: batch_test_targets,
-                    seq_len: batch_test_seq_len,
-                    training: False
-                    }
-            test_ler,d = sess.run((ler,decoded[0]), feed_dict=t_feed, options=run_options)#,run_metadata = run_metadata)
-            dense_decoded = tf.sparse_tensor_to_dense(d, default_value=-1).eval(session=sess)
-            for i, seq in enumerate(dense_decoded):
-                seq = [s for s in seq if s != -1]
-                tmp_o = decode_to_chars(test_targets[i])
-                tmp_d = decode_to_chars(seq)
-                print('Sequence %d' % i)
-                print('\t Original:\n%s' % tmp_o)
-                print('\t Decoded:\n%s' % tmp_d)
-                #print('\t Corrected:\n%s' % tmp_corr)
-                print('Done!')
-            log = "Epoch {}/{}  |  Batch Cost : {:.3f}  |  Train Accuracy : {:.3f}%  |  Test Accuracy : {:.3f}%  |  Time Elapsed : {:.3f}s"
-            print(log.format(curr_epoch+1, num_epochs, train_cost, 100-(train_ler*100), 100-(test_ler*100), time.time() - start))
-            t_summary = sess.run(merged, feed_dict=t_feed, options=run_options)#, run_metadata=run_metadata)
-            test_writer.add_summary(t_summary, int(batch+(curr_epoch*num_batches_per_epoch)))
-            #test_writer.add_run_metadata(run_metadata, 'step%03d' % int(batch+(curr_epoch*num_batches_per_epoch)))
-            test_writer.flush()
-            save_path = saver.save(sess, savepath+'/model')
-            print(">>> Model saved succesfully")
-        print('Total Training Time: '+str(time.time() - initstart)+'s')
+if __name__ == '__main__':
+    # Let's allow the user to pass the filename as an argument
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--train", default="True", type=str, help="Training flag")
+    parser.add_argument("--wav", default="eg.wav", type=str, help="Example audio file")
+    args = parser.parse_args()
+
+    train = args.train
+    file_ = args.wav
+    print(train)
+    if train:
+        train_loop()
+    else:
+        tf.reset_default_graph()
+        imported_meta = tf.train.import_meta_graph("totalsummary/ckpt/model.meta")
+        with tf.Session() as sess:
+            imported_meta.restore(sess, tf.train.latest_checkpoint('totalsummary/ckpt'))
