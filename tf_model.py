@@ -52,7 +52,7 @@ with tf.device("/cpu:0"):
     BLSTM = False
     batch_norm = True
     layer_norm = False
-    input_noise = True
+    input_noise = False
     noise_magnitude = 0.0
     lambda_l2_reg = 0.00
     opt_momentum = False
@@ -62,7 +62,7 @@ with tf.device("/cpu:0"):
     opt_sgd = False
     opt_rmsprop = True
 
-    dataset = 'TIMIT' #[TIMIT / LibriSpeech]
+    dataset = 'LibriSpeech' #[TIMIT / LibriSpeech]
     ##############
 
     #PARAMS
@@ -495,7 +495,7 @@ def train_loop():
             run_options = tf.RunOptions(trace_level=tf.RunOptions.FULL_TRACE,output_partition_graphs=True)
             run_metadata = tf.RunMetadata()
             tf.global_variables_initializer().run()
-            saver = tf.train.Saver()
+            saver = tf.train.Saver(save_relative_paths=True)
             #Load paths
             for curr_epoch in range(num_epochs):
                 print('>>>',time.strftime('[%H:%M:%S]'), 'Epoch',curr_epoch+1,'/',num_epochs)
@@ -580,7 +580,7 @@ if __name__ == '__main__':
 
     train = args.train
     file_ = args.wav
-    print(train)
+    #print(train)
     if train:
         train_loop()
     else:

@@ -8,14 +8,22 @@ import time
 import string
 import RPi.GPIO as GPIO
 GPIO.setmode(GPIO.BCM)
-
+GPIO.setwarnings(False)
 
 def char2braille(char):
     out = [[0,0],[0,0],[0,0]]
     o = ord(char)-97
     k = o % 10
+    if o == -65:
+        return [[0,0],[0,0],[0,0]]
     if o == 22:
-        return [[0,1],[1,1],[1,1]]
+        return [[0,1],[1,1],[0,1]]
+    if o == 23:
+        return [[1,1],[0,0],[1,1]]
+    if o == 24:
+        return [[1,1],[0,1],[1,1]]
+    if o == 25:
+        return [[1,0],[0,1],[1,1]]
     if k <= 7:
         out[0][0]=1
     if k in [2,3,5,6,8,9]:
@@ -48,17 +56,19 @@ def disp(arr,s_len=1):
     GPIO.setup(13,GPIO.OUT, initial=0)
     for i in arr:
         z = [k for j in i for k in j]
+        for j in range(len(z)):
+            if z[j] == 1:
+                GPIO.output(dic[j],GPIO.HIGH)
+        time.sleep(s_len)
         GPIO.output(16,GPIO.LOW)
         GPIO.output(26,GPIO.LOW)
         GPIO.output(20,GPIO.LOW)
         GPIO.output(19,GPIO.LOW)
         GPIO.output(21,GPIO.LOW)
         GPIO.output(13,GPIO.LOW)
-        for j in range(len(z)):
-            if z[j] == 1:
-                GPIO.output(dic[j],GPIO.HIGH)
-        time.sleep(s_len)
 
-seq = seq2braille('abcdefghijklmnopqrstuvwxyz')
-disp(seq,s_len=1)
+
+
+seq = seq2braille(sys.argv[1])
+disp(seq,float(sys.argv[2]))
 print(seq)
