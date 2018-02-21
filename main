@@ -1,0 +1,8 @@
+echo 'Cleaning Directories...'
+sudo rm tmp*.wav
+echo 'Audio Record'
+sudo arecord -D plughw:1,0 -t wav -r 16000 -d 3 tmp.wav
+echo 'Doing Preprocessing'
+sudo sox -v 0.4 tmp.wav _tmp.wav
+echo 'Loading Neural Network'
+sudo python load_meta.py _tmp.wav

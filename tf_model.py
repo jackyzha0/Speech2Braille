@@ -43,7 +43,7 @@ with tf.device("/cpu:0"):
     # Network Params #
     num_mfccs = 13
     num_classes = 28
-    num_hidden = 256
+    num_hidden = 128
     learning_rate = 1e-4
     momentum = 0.9
     decay = 0.9
@@ -62,7 +62,7 @@ with tf.device("/cpu:0"):
     opt_sgd = False
     opt_rmsprop = True
 
-    dataset = 'LibriSpeech' #[TIMIT / LibriSpeech]
+    dataset = 'TIMIT' #[TIMIT / LibriSpeech]
     ##############
 
     #PARAMS
@@ -150,9 +150,11 @@ with tf.device("/cpu:0"):
     ##############
 
     # Log Params #
-    logs_path = 'totalsummary/logs/'+datetime.datetime.fromtimestamp(time.time()).strftime('%H:%M:%S')+'_'+str(batchsize)+'_'+str(num_epochs)
-    savepath = 'totalsummary/ckpt'
+    logs_path = './totalsummary/logs/'+datetime.datetime.fromtimestamp(time.time()).strftime('%H:%M:%S')+'_'+str(batchsize)+'_'+str(num_epochs)
+    savepath = os.getcwd() + '/totalsummary/ckpt'
     ##############
+
+    print(savepath)
 
     print(time.strftime('[%H:%M:%S]'), 'Parsing testing directory... ')
     t_dr = load_dir(test_path)
@@ -446,7 +448,7 @@ with tf.device("/device:GPU:0"):
             # Time major
             logits = tf.transpose(logits, (1, 0, 2), name="out/logits")
         with tf.name_scope('loss'):
-            loss = tf.nn.ctc_loss(targets, logits, seq_len, ignore_longer_outputs_than_inputs=True)
+            loss = tf.nn.ctc_loss(targets, logits, seq_len)
             #loss = tf.reduce_mean(tf.boolean_mask(x, tf.logical_not(tf.is_inf(x))))
             #loss = tf.reduce_mean(x)
         with tf.name_scope('cost'):
@@ -495,7 +497,7 @@ def train_loop():
             run_options = tf.RunOptions(trace_level=tf.RunOptions.FULL_TRACE,output_partition_graphs=True)
             run_metadata = tf.RunMetadata()
             tf.global_variables_initializer().run()
-            saver = tf.train.Saver(save_relative_paths=True)
+            saver = tf.train.Saver()
             #Load paths
             for curr_epoch in range(num_epochs):
                 print('>>>',time.strftime('[%H:%M:%S]'), 'Epoch',curr_epoch+1,'/',num_epochs)

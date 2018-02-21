@@ -1,9 +1,9 @@
 import math
 import numpy as np
 import tensorflow as tf
-from tensorflow.python.ops.rnn_cell import RNNCell
+#import tf.contrib.rnn.RNNCell as RNNCell
 
-class LSTMCell(RNNCell):
+class LSTMCell(tf.contrib.rnn.RNNCell):
     '''Vanilla LSTM implemented with same initializations as BN-LSTM'''
     def __init__(self, num_units):
         self.num_units = num_units
@@ -44,7 +44,7 @@ class LSTMCell(RNNCell):
             return new_h, (new_c, new_h)
 
 
-class BNLSTMCell(RNNCell):
+class BNLSTMCell(tf.contrib.rnn.RNNCell):
     '''Batch normalized LSTM as described in arxiv.org/abs/1603.09025'''
     def __init__(self, num_units, training):
         self.num_units = num_units
@@ -123,8 +123,8 @@ def batch_norm(x, name_scope, training, epsilon=1e-3, decay=0.999):
         scale = tf.get_variable('scale', [size], initializer=tf.constant_initializer(0.1))
         offset = tf.get_variable('offset', [size])
 
-        pop_mean = tf.get_variable('pop_mean', [size], initializer=tf.zeros_initializer, trainable=False)
-        pop_var = tf.get_variable('pop_var', [size], initializer=tf.ones_initializer, trainable=False)
+        pop_mean = tf.get_variable('pop_mean', [size], initializer=tf.zeros_initializer(), trainable=False)
+        pop_var = tf.get_variable('pop_var', [size], initializer=tf.ones_initializer(), trainable=False)
         batch_mean, batch_var = tf.nn.moments(x, [0])
 
         train_mean_op = tf.assign(pop_mean, pop_mean * decay + batch_mean * (1 - decay))

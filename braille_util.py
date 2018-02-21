@@ -69,6 +69,4 @@ def disp(arr,s_len=1):
 
 
 
-seq = seq2braille(sys.argv[1])
-disp(seq,float(sys.argv[2]))
-print(seq)
+
