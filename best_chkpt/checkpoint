@@ -1,2 +1,2 @@
-model_checkpoint_path: "/home/jacky/2kx/rpi/totalsummary/ckpt/model"
-all_model_checkpoint_paths: "/home/jacky/2kx/rpi/totalsummary/ckpt/model"
+model_checkpoint_path: "/home/jacky/2kx/nsound_git/totalsummary/ckpt/model"
+all_model_checkpoint_paths: "/home/jacky/2kx/nsound_git/totalsummary/ckpt/model"
