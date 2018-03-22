@@ -27,12 +27,12 @@ avconv -loglevel 0 -i $1 -f wav -ab 192000 -vn ${noise_file}
 
 # Creating a noise profile, basically looking for white noise
 # in 0 to 0.5 sec of the clip (change if you like)
-sox ${noise_file} -n trim 0 -1  noiseprof noisemask
+sox ${noise_file} -n trim 0 -0.5  noiseprof noisemask
 
 # Removing noise using noise profile
 sox ${noise_file} ${noisefree_file} noisered noisemask $2
 
 b_name=$(basename $1)
-cp ${noisefree_file} _$1
+cp ${noisefree_file} $1
 # Replacing noisyAudio with noisefree audio in original video
 #avconv  -loglevel 0  -i $1 -i /tmp/noisefree.wav -c:v copy -c:a aac -strict experimental -map 0:v:0 -map 1:a:0 noisefree_$1.mp4

@@ -30,7 +30,7 @@ with tf.device("/cpu:0"):
     # Network Params #
     num_mfccs = 13
     num_classes = 28
-    num_hidden = 100
+    num_hidden = 512
     learning_rate = 1e-4
     momentum = 0.9
     decay = 0.9
@@ -51,7 +51,7 @@ with tf.device("/cpu:0"):
         path = '/home/jacky/2kx/__data/TIMIT/TRAIN/*/*'
     if dataset == 'LibriSpeech':
         test_path = '/home/jacky/2kx/__data/LibriSpeech/test-clean/*/*'
-        path = '/home/jacky/2kx/__data/LibriSpeech/train/*/*/*'
+        path = '/home/jacky/2kx/__data/LibriSpeech/train/train-clean-100/*/*'
 
     logImages = False
 
@@ -131,7 +131,7 @@ with tf.device("/cpu:0"):
     # Training Params #
     num_examples = dr[2]
     num_epochs = 1000
-    batchsize = 256
+    batchsize = 64
     num_batches_per_epoch = int(num_examples/batchsize)
     ##############
 
