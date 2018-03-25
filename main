@@ -1,6 +1,0 @@
-echo 'Cleaning Directories...'
-sudo rm tmp.wav
-echo 'Audio Record'
-sudo rec tmp.wav rate 16k silence 1 0.1 10% 1 0:00:03 10%
-echo 'Loading Neural Network'
-sudo python load_meta.py tmp.wav 0.4

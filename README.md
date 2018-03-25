@@ -1,19 +1,18 @@
-nsound
+Speech2Braille - Jacky Zhao
 
-Abstract:
-Over 360 million people have disabling hearing loss. One of the main impacts hearing loss has, is on an individual’s ability to communicate with others. This can have adverse affects on people, such as causing emotional distress, greater need for assistance, and missed opportunities for employment or education. Citing from the WHO, “[The cost of] Loss of productivity, due to unemployment and premature retirement among people with hearing loss, is conservatively estimated to cost $678 billion annually.” Most people with hearing loss are able to communicate in the world through lip reading and other visual cues; however, are unable to react to audio cues where the speaker is not visible (behind them, speakers, alarms, etc.) This debilitates those with hearing loss in the workforce and creates dangerous scenarios in which these people may not hear an alarm.
+Over 360 million people in the world have disabling hearing loss. Hearing loss can have debilitating effects on a person that makes day to day communication and life very difficult. They face discrimination, as many people and employers find it too much effort to communicate with the deaf. More importantly, the deaf are not able to receive public announcements, warnings, and alarms, which can serve to be a health and safety hazard. For many, current solutions that allow them alleviate these problems have problems themselves that prevent them from being accessible to everyone.
 
-This experiment entailed creating a machine learning network to convert streams of audio data into a readable output (Braille).
+This project entailed creating an end-to-end speech recognition system using an ANN and a portable device to display braille. The device, made from a Raspberry Pi B, is able to recognize audio and transcribe it into Braille through the haptic feedback device via the ANN. The feedback device is a self-made hat, consisting of 6 solenoids, allows the Raspberry Pi to control the 6 solenoids via the GPIO outputs. The neural network itself is 2 layered LSTM network with 256 hidden cells in each layer. The model was trained on the LibriSpeech ‘clean-100’ dataset for ____ hours, and attained a final accuracy of ___on the training set and _____ on the test set. Accuracy of the network was determined using a metric called the Levenshtein edit distance. The model accuracy could not be improved due to time and hardware constraints.
+
 
 Network Details:
 * Character Wise Decoding
-* Input - TIMIT Dataset
-* Preprocessing for features - 13 MFCCs
-* Reshaping and batching for input - Rank 3 Tensor (batchsize, time, num_features)
-* Deep LSTM Network Hyperparemters
-	* Learning Rate = 1e-3
-	* Momentum = 0.9
-	* Dropout Rate = 0.5
-	* Number of Hidden Layers = 100
-	* Network Depth = 2
-	* CTC Loss and Decoder
+* Training Data - LibriSpeech "clean-100"
+* Preprocessing for features - 13 MFCCs + 1st Derivatives, normalize to stddev of 1
+* Optimizer: RMSPropOptimizer
+* Learning Rate: 1e-4
+* Number of Hidden Cells: 256
+* Number of Layers: 2
+* Regulurization: White Noise (stddev: 0.01)
+* CTC Loss
+* Greedy Decoder
