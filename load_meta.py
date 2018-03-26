@@ -46,24 +46,23 @@ out3 = graph.get_tensor_by_name("decoder/CTCGreedyDecoder:3")
 
 print("Waiting for audio...")
 
-def features(rawsnd,num):    
+def features(rawsnd, num) :
+    """Compute num amount of audio features of a sound
+    Args:
+        rawsnd : array with string paths to .wav files
+        num : numbers of mfccs to compute
+    Returns:
+        Return a num x max_stepsize*32 feature vector
+    """
     import librosa
     import librosa.feature as lib_feat
     x, sample_rate = librosa.load(rawsnd, sr=16000)
-    ft = lib_feat.mfcc(y=x, sr=sample_rate, n_mfcc=num, n_fft=int(sample_rate*0.025), hop_length=int(sample_rate*0.010)).T
-    t_ft = ft
-    ft = np.append(ft,lib_feat.delta(t_ft),axis=1)
-    ft = np.append(ft,lib_feat.delta(t_ft,order=2),axis=1)
-    ft /= np.max(np.abs(ft),axis=0)
-    #ft += np.random.normal(scale=0.5,size=ft.shape)
-    #import matplotlib.pyplot as plt
-    #import librosa.display
-    #plt.figure(figsize=(12,4))
-    #librosa.display.specshow(ft, sr=sample_rate, x_axis='time', y_axis='mel')
-    #plt.colorbar(format='%+02.0f dB')
-    #plt.tight_layout()
-    #plt.show()
-    return (ft)
+    ft = lib_feat.mfcc(y=x, sr=sample_rate, n_mfcc=num, n_fft=int(sample_rate*0.025), hop_length=int(sample_rate*0.010))
+    ft[0] = lib_feat.rmse(y=x, hop_length=int(0.010*sample_rate), n_fft=int(0.025*sample_rate))
+    deltas = librosa.feature.delta(ft)
+    ft_plus_deltas = np.vstack([ft, deltas])
+    ft_plus_deltas /= np.max(np.abs(ft_plus_deltas),axis=0)
+    return (ft_plus_deltas.T)
 
 def decode_to_chars(test_targets):
     tmp_o = ""
