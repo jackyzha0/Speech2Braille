@@ -1,5 +1,4 @@
 *.pyc
 totalsummary/*
-tfevents
-timit_pickle/*
+pickle/*
 *.npy
