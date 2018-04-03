@@ -27,7 +27,7 @@ avconv -loglevel 0 -i $1 -f wav -ab 192000 -vn ${noise_file}
 
 # Creating a noise profile, basically looking for white noise
 # in 0 to 0.5 sec of the clip (change if you like)
-sox ${noise_file} -n trim 0 -0.5  noiseprof noisemask
+sox ${noise_file} -n trim 0 -1 noiseprof noisemask
 
 # Removing noise using noise profile
 sox ${noise_file} ${noisefree_file} noisered noisemask $2

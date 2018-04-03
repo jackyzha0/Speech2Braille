@@ -21,20 +21,17 @@ import glob
 print('[OK] glob ')
 import os
 print('[OK] os ')
-import gc
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 os.environ["CUDA_VISIBLE_DEVICES"] = '0'
 
-config=tf.ConfigProto(allow_soft_placement=True)
-config.gpu_options.per_process_gpu_memory_fraction = 0.85
-config.gpu_options.allow_growth = True
+config=tf.ConfigProto()
 
 with tf.device("/cpu:0"):
     # Network Params #
     num_mfccs = 13
     num_classes = 28
-    num_hidden = 256
-    learning_rate = 1e-4
+    num_hidden = 512
+    learning_rate = 1e-3
     momentum = 0.9
     decay = 0.9
     num_layers = 2
@@ -134,7 +131,7 @@ with tf.device("/cpu:0"):
     # Training Params #
     num_examples = dr[2]
     num_epochs = 1000
-    batchsize = 128
+    batchsize = 64
     num_batches_per_epoch = int(num_examples/batchsize)
     ##############
 
@@ -143,7 +140,7 @@ with tf.device("/cpu:0"):
     savepath = os.getcwd() + '/totalsummary/ckpt'
     ##############
 
-    #print(savepath)
+    print(savepath)
 
     print(time.strftime('[%H:%M:%S]'), 'Parsing testing directory... ')
     t_dr = load_dir(test_path)
@@ -295,7 +292,7 @@ with tf.device("/cpu:0"):
         return x, lengths
     ####################
 
-with tf.device("/device:CPU:0"):
+with tf.device("/device:GPU:0"):
     print(time.strftime('[%H:%M:%S]'), 'Loading network functions... ')
     graph = tf.Graph()
     with graph.as_default():
@@ -320,7 +317,7 @@ with tf.device("/device:CPU:0"):
             outputs = tf.reshape(outputs, [-1, num_hidden])
 
         with tf.name_scope('weights'):
-            W = tf.Variable(tf.truncated_normal([num_hidden,num_classes], stddev=0.1),name='weights')
+                W = tf.Variable(tf.truncated_normal([num_hidden,num_classes], stddev=0.1),name='weights')
         with tf.name_scope('biases'):
             b = tf.get_variable("b", initializer=tf.constant(0., shape=[num_classes]))
 
@@ -406,7 +403,6 @@ def train_loop():
                         train_writer.add_summary(summary, int(batch+(curr_epoch*num_batches_per_epoch)))
                         #train_writer.add_run_metadata(run_metadata, 'step%03d' % int(batch+(curr_epoch*num_batches_per_epoch)))
                         train_writer.flush()
-                    gc.collect()
 
                 # Metrics mean
                 train_cost /= num_examples

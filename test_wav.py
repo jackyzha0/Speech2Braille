@@ -22,7 +22,7 @@ bcolors =  {
 def color_print(my_str, color="yellow"):
         print(bcolors[color]  + my_str  + bcolors["end"])
 
-
+print("\033c")
 color_print(str(time.strftime('[%H:%M:%S]'))+' '+"Preloading Modules into memory ... ")
 import subprocess
 import tensorflow as tf
@@ -89,18 +89,12 @@ def process(f,i,s):
     print("...Calculating Features")
     dat=features(str(f),num_mfccs)
     feed_dict = {i:[dat],s:[len(dat)]}
-    print("...Running ANN")
+    print("...Speech Recognizing")
     z = sess.run((out,out1,out2,out3),feed_dict)
     d = decode_to_chars(z[1])
-    print("\nRecognized Speech: " + bcolors["green"]+str(d)+ bcolors["end"])
+    print("\n\nRecognized Speech: " + bcolors["green"]+str(d)+ bcolors["end"])
     seq2 = braille_util.seq2braille(d)
     braille_util.disp(seq2,0.1)
     #print("Execution time: %s seconds" % (time.time() - start_time))
 
-while True:
-    #print('prevstate',prevstate,'state',state)
-    time.sleep(0.1)
-    if 'check' in os.listdir('_dir') and os.path.isfile('_dir/gpio_on'):
-        process('_dir/tmp.wav',inp,seq)
-        os.remove('_dir/check')
-        os.remove('_dir/tmp.wav')
+process(sys.argv[1],inp,seq)
