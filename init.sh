@@ -8,7 +8,6 @@ trap ctrl_c SIGINT
 function ctrl_c() {
     echo "** Cleaning up and exiting..."
     kill $BGPID
-    kill $BGPID2
     rm _dir/*
     exit
 }
@@ -17,33 +16,21 @@ if [ "$EUID" -ne 0 ]
     exit
 fi
 
-echo -e ${clear} 
-echo -e "${yellow}** Preloading Python Modules...${end}" > /dev/tty1
-python load_meta.py &
-BGPID=$!
+echo -e ${clear} > /dev/tty1
+echo -e "\n${yellow}**Cleaning Up director...${end}" > /dev/tty1
 rm _dir/*
-sleep 40
-python gpiostates.py &
-BGPID2=$!
-echo -e "\n" 
+python gpiostates.py 2>&1 > /dev/tty1&
+BGPID=$!
+echo -e "\nChecking for Button & Audio ..." > /dev/tty1
 while true
 do
     if [ ! -e _dir/check ] && [ -e _dir/gpio_on ]; then
-	tput cup 11 0
         rm _dir/tmp.wav
-        echo -e "${yellow}[RECORDING] ... ${end}"
-        arecord -D plughw:1,0 --duration=10 -f S16 -r 16000 '_dir/tmp.wav' 2>&1 | cat - > /dev/tty1
-        #rec -d -b 8 '_dir/tmp.wav' silence -l 0 0 0:00:05 5% rate 16k 2>&1  | cat - > /dev/tty1
-	#sox '_dir/t.wav' '_dir/tmp.wav' rate 16000
-        #soxi '_dir/t.wav'
-        #soxi '_dir/tmp.wav'
-        #rm '_dir/t.wav'
-        #rec -c 2 -r 16000 '_dir/tmp.wav' silence 0 0 0:00:03 5% 2>&1  | cat - > /dev/tty1
-	#cp _dir/tmp.wav /tmp/tmp.wav
+        echo "***** [RECORDING] *****"
+        eval $"rec -c 1 -r 16000 '_dir/tmp.wav' silence 1 0.1 5% 1 0:00:01 1%"
         touch _dir/check
         cp _dir/tmp.wav /media/usb1
-        echo -e "${yellow}[RECORDING ENDED]${end}"
-	tput ed
+        echo "***** [RECORDING ENDED] *****"
     fi
     sleep 1
 done
