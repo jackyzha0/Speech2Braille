@@ -15,7 +15,7 @@ def transcribe(JOB_URL):
     )
 
     while True:
-        status = AWS_transcribe_client.get_transcription_job(TranscriptionJobName=job_name)
+        status = AWS_transcribe_client.get_transcription_job(TranscriptionJobName='speech2txt')
         if status['TranscriptionJob']['TranscriptionJobStatus'] in ['COMPLETED', 'FAILED']:
             break
         print("Not ready yet...")
