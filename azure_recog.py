@@ -1,6 +1,7 @@
 import requests
 import wave
 import json
+import time
 
 subscription_key = '3c86100c6a4b482b9a41552d5f05859b'
 ENDPOINT = 'https://westus.stt.speech.microsoft.com/speech/recognition/conversation/cognitiveservices/v1'
