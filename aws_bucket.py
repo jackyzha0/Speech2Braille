@@ -7,7 +7,7 @@ AWS_transcribe_client = boto3.client('transcribe')
 BUCKETPATH = 'https://s3-us-west-2.amazonaws.com/speech2wavbucket/_dir/tmp.wav'
 
 def transcribe(JOB_URL):
-    transcribe.start_transcription_job(
+    AWS_transcribe_client.start_transcription_job(
         TranscriptionJobName='speech2txt',
         Media={'MediaFileUri': JOB_URL},
         MediaFormat='wav',
@@ -15,11 +15,11 @@ def transcribe(JOB_URL):
     )
 
     while True:
-    status = transcribe.get_transcription_job(TranscriptionJobName=job_name)
-    if status['TranscriptionJob']['TranscriptionJobStatus'] in ['COMPLETED', 'FAILED']:
-        break
-    print("Not ready yet...")
-    time.sleep(1)
+        status = AWS_transcribe_client.get_transcription_job(TranscriptionJobName=job_name)
+        if status['TranscriptionJob']['TranscriptionJobStatus'] in ['COMPLETED', 'FAILED']:
+            break
+        print("Not ready yet...")
+        time.sleep(1)
     return(status)
 
 def process(path):
