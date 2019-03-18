@@ -4,7 +4,7 @@ import boto3
 
 AWS_s3_client = boto3.client('s3')
 AWS_transcribe_client = boto3.client('transcribe')
-BUCKETPATH = 'https://s3-us-east-1.amazonaws.com/s2bwavbucket/_dir/tmp.wav'
+BUCKETPATH = 'https://s3.amazonaws.com/s2bwavbucket/_dir/tmp.wav'
 
 def transcribe(JOB_URL):
     response = AWS_transcribe_client.delete_transcription_job(
