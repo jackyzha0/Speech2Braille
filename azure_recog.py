@@ -2,6 +2,7 @@ import requests
 import wave
 import json
 import time
+import os
 
 subscription_key = '3c86100c6a4b482b9a41552d5f05859b'
 ENDPOINT = 'https://westus.stt.speech.microsoft.com/speech/recognition/conversation/cognitiveservices/v1'
@@ -17,17 +18,6 @@ def transcribe(path):
                                 'Accept': 'application/json;text/xml'}
                             )
     return res.json()['DisplayText']
-
-def transcribe(path):
-    speech_config = speechsdk.SpeechConfig(subscription=subscription_key, region='westus')
-    audio_config = speechsdk.audio.AudioConfig(filename="_dir/tmp.wav")
-    speech_recognizer = speechsdk.SpeechRecognizer(speech_config=speech_config, audio_config=audio_config)
-    result = speech_recognizer.recognize_once()
-
-    if result.reason == speechsdk.ResultReason.RecognizedSpeech:
-        return result.text
-    else:
-        return ""
 
 def process(path):
     open('_dir/azure_lock', 'a').close()
