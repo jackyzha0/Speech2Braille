@@ -23,7 +23,7 @@ while True:
         state_changed = 1
     else:
         state_changed = 0
-    prevstate = GPIO.input(4)
+        prevstate = GPIO.input(4)
     if not state_changed:
         sleep(0.1)
         continue
