@@ -4,7 +4,7 @@ import boto3
 
 AWS_s3_client = boto3.client('s3')
 AWS_transcribe_client = boto3.client('transcribe')
-BUCKETPATH = 'https://s3-us-west-2.amazonaws.com/speech2wavbucket/_dir/tmp.wav'
+BUCKETPATH = 'https://s3-us-east-1.amazonaws.com/s2bwavbucket/_dir/tmp.wav'
 
 def transcribe(JOB_URL):
     response = AWS_transcribe_client.delete_transcription_job(
@@ -28,7 +28,7 @@ def transcribe(JOB_URL):
 
 def process(path):
     open('_dir/aws_lock', 'a').close()
-    AWS_s3_client.upload_file(path, 'speech2wavbucket', path)
+    AWS_s3_client.upload_file(path, 's2bwavbucket', path)
     print('NEWFILE')
     result = transcribe(BUCKETPATH)
     print('TRANSCRIPTION: ', result)
