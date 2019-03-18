@@ -21,7 +21,7 @@ echo -e ${clear} > /dev/tty1
 echo -e "\n${yellow}**Cleaning Up directory...${end}" > /dev/tty1
 echo -e "\n${yellow}**Cleaning Up directory...${end}"
 rm _dir/*
-python aws.py &
+python aws_bucket.py &
 BGPID2=$!
 python gpiostates.py 2>&1 > /dev/tty1&
 BGPID=$!
@@ -29,7 +29,7 @@ echo -e "\nChecking for Button & Audio ..." > /dev/tty1
 echo -e "\nChecking for Button & Audio ..."
 while true
 do
-    if [ ! -e _dir/check ] && [ -e _dir/gpio_on ]; then
+    if [ ! -e _dir/aws_lock ] && [ ! -e _dir/check ] && [ -e _dir/gpio_on ]; then
         rm _dir/tmp.wav
         echo "***** [RECORDING] *****" > /dev/tty1
         echo "***** [RECORDING] *****"

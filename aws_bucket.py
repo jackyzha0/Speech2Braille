@@ -1,8 +1,14 @@
 import os
 import time
+import boto3
+
+AWS_s3_client = boto3.client('s3')
+
 
 def process(path):
-    print(path)
+    open('_dir/aws_lock', 'a').close()
+    AWS_s3_client.upload_file(path, 'speech2braille_wav_bucket', path)
+    os.remove('_dir/aws_lock.wav')
 
 while True:
     time.sleep(0.1)
