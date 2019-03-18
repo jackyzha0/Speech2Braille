@@ -3,10 +3,13 @@ import time
 import boto3
 
 AWS_s3_client = boto3.client('s3')
+BUCKETPATH = 'https://s3-us-west-2.amazonaws.com/speech2wavbucket/_dir/tmp.wav'
 
 def process(path):
     open('_dir/aws_lock', 'a').close()
     AWS_s3_client.upload_file(path, 'speech2wavbucket', path)
+    print('NEWFILE')
+    time.sleep(5)
     os.remove('_dir/aws_lock')
 
 while True:
