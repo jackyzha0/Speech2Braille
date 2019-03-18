@@ -20,23 +20,22 @@ print("%sIDLE%s mode, press %sButton%s to start..." %(green_c, end_c, yellow_c, 
 while True:
     if GPIO.input(4) == 0 and prevstate == 1:
         state = not state
-	state_changed =1
+        state_changed = 1
     else:
-	state_changed = 0
-	
+        state_changed = 0
     prevstate = GPIO.input(4)
     if not state_changed:
-	sleep(0.1)
-	continue
+        sleep(0.1)
+        continue
 
     if state:
-	os.system("tput cup 9 0; tput ed")
+        os.system("tput cup 9 0; tput ed")
         print("%sRECORDING%s mode, press %sButton%s to stop ..." %(red_c, end_c, yellow_c, end_c))
         GPIO.output(17,GPIO.HIGH)
         with open('_dir/gpio_on',"w") as f:
             f.write("")
     else:
-	os.system("tput cup 9 0")
+        os.system("tput cup 9 0")
         print("%sIDLE%s mode, press %sButton%s to start ..." %(green_c, end_c, yellow_c, end_c))
         try:
             os.remove('_dir/gpio_on')
