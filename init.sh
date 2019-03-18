@@ -30,10 +30,10 @@ do
     if [ ! -e _dir/check ] && [ -e _dir/gpio_on ]; then
         rm _dir/tmp.wav
         echo "***** [RECORDING] *****"
-        eval $"rec -c 1 -r 16000 '_dir/tmp.wav' silence 1 0.1 5% 1 0:00:01 1% 2>&1 | cat - > /dev/tty1"
+        eval $"rec -c 1 -r 48000 '_dir/tmp.wav' silence 1 0.1 5% 1 0:00:01 1% 2>&1 | cat - > /dev/tty1"
         touch _dir/check
         cp _dir/tmp.wav /media/usb1
         echo "***** [RECORDING ENDED] *****"
     fi
-    sleep 1
+    # sleep 1
 done
