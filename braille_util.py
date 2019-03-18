@@ -67,6 +67,6 @@ def disp(arr,s_len=1):
         GPIO.output(21,GPIO.LOW)
         GPIO.output(13,GPIO.LOW)
 
-
-
-
+if __name__ == "__main__":
+    seq = seq2braille('test')
+    disp(seq)

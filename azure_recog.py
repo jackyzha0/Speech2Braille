@@ -24,7 +24,7 @@ def process(path):
     open('_dir/azure_lock', 'a').close()
     result = transcribe(path)
     print('TRANSCRIPTION: ', result)
-    braille_util.disp(result)
+    braille_util.disp(braille_util.seq2braille(result))
     os.remove('_dir/azure_lock')
 
 while True:
