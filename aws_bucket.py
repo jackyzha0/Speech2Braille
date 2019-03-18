@@ -7,9 +7,10 @@ AWS_transcribe_client = boto3.client('transcribe')
 BUCKETPATH = 'https://s3-us-west-2.amazonaws.com/speech2wavbucket/_dir/tmp.wav'
 
 def transcribe(JOB_URL):
-    response = client.delete_transcription_job(
+    response = AWS_transcribe_client.delete_transcription_job(
         TranscriptionJobName='speech2txt'
     )
+    print('Delete Previous Job Status: ', response)
     AWS_transcribe_client.start_transcription_job(
         TranscriptionJobName='speech2txt',
         Media={'MediaFileUri': JOB_URL},
