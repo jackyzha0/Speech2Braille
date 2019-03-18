@@ -1,0 +1,4 @@
+*.pyc
+totalsummary/*
+pickle/*
+*.npy
