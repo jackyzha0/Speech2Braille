@@ -3,6 +3,7 @@ import wave
 import json
 import time
 import os
+import braille_util
 
 subscription_key = '3c86100c6a4b482b9a41552d5f05859b'
 ENDPOINT = 'https://westus.stt.speech.microsoft.com/speech/recognition/conversation/cognitiveservices/v1'
@@ -23,6 +24,7 @@ def process(path):
     open('_dir/azure_lock', 'a').close()
     result = transcribe(path)
     print('TRANSCRIPTION: ', result)
+    braille_util.disp(result)
     os.remove('_dir/azure_lock')
 
 while True:
