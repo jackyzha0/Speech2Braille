@@ -3,13 +3,31 @@ import time
 import boto3
 
 AWS_s3_client = boto3.client('s3')
+AWS_transcribe_client = boto3.client('transcribe')
 BUCKETPATH = 'https://s3-us-west-2.amazonaws.com/speech2wavbucket/_dir/tmp.wav'
+
+def transcribe(JOB_URL):
+    transcribe.start_transcription_job(
+        TranscriptionJobName='speech2txt',
+        Media={'MediaFileUri': JOB_URL},
+        MediaFormat='wav',
+        LanguageCode='en-US'
+    )
+
+    while True:
+    status = transcribe.get_transcription_job(TranscriptionJobName=job_name)
+    if status['TranscriptionJob']['TranscriptionJobStatus'] in ['COMPLETED', 'FAILED']:
+        break
+    print("Not ready yet...")
+    time.sleep(1)
+    return(status)
 
 def process(path):
     open('_dir/aws_lock', 'a').close()
     AWS_s3_client.upload_file(path, 'speech2wavbucket', path)
     print('NEWFILE')
-    time.sleep(5)
+    result = transcribe(BUCKETPATH)
+    print('TRANSCRIPTION: ', result)
     os.remove('_dir/aws_lock')
 
 while True:
