@@ -70,4 +70,5 @@ def disp(arr,s_len=1):
 
 if __name__ == "__main__":
     seq = seq2braille('test')
+    print(seq)
     disp(seq)
