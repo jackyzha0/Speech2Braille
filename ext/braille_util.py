@@ -40,7 +40,8 @@ def char2braille(char):
 
 def seq2braille(inp):
     out = ''.join([i for i in inp if not i.isdigit()])
-    out = (list(out.lower().translate(None, string.punctuation)))
+    translator = str.maketrans('', '', string.punctuation)
+    out = (list(out.lower().translate(translator)))
     k_out = []
     for i in out:
         k_out.append(char2braille(i))
@@ -67,6 +68,7 @@ def disp(arr,s_len=1):
         GPIO.output(21,GPIO.LOW)
         GPIO.output(13,GPIO.LOW)
 
-
-
-
+if __name__ == "__main__":
+    seq = seq2braille('test')
+    print(seq)
+    disp(seq)

@@ -21,7 +21,7 @@ echo -e ${clear} > /dev/tty1
 echo -e "\n${yellow}**Cleaning Up directory...${end}" > /dev/tty1
 echo -e "\n${yellow}**Cleaning Up directory...${end}"
 rm _dir/*
-python3 aws_bucket.py &
+python3 azure_recog.py &
 BGPID2=$!
 python3 gpiostates.py 2>&1 > /dev/tty1&
 BGPID=$!
